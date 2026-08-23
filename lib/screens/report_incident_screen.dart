@@ -724,7 +724,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 widget.user['name']?.toString() ??
                 'User',
             initialStatus:
-                _submissionInfo['initial_status']?.toString() ?? 'Pending',
+                _submissionInfo['initial_status']?.toString() ?? 'Reported',
             date: _formatLongDate(
               _parseDate(_submissionInfo['date']) ?? DateTime.now(),
             ),
