@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'core/global_theme_controller.dart';
+import 'services/native_push_service.dart';
 
 import 'widgets/global_sos_overlay.dart';
 
 import 'screens/auth_gate.dart';
 import 'widgets/mobile_update_gate.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await NativePushService.instance.initialize();
 
   runApp(const TabangNowApp());
 }

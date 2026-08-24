@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -9,6 +10,7 @@ import '../widgets/global_notification_bell.dart';
 import '../widgets/sos_flip_coin_button.dart';
 import '../widgets/global_account_footer.dart';
 import '../services/notification_center_service.dart';
+import '../services/native_push_service.dart';
 
 import '../core/app_capabilities.dart';
 import '../core/app_module.dart';
@@ -124,6 +126,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _brandingService = BrandingService(authService: _authService);
+    unawaited(
+      NativePushService.instance.syncForAuthenticatedUser(_authService),
+    );
     _loadInitialData();
   }
 
@@ -240,6 +245,14 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _loggingOut = true;
     });
+
+    try {
+      await NativePushService.instance.unregisterForAuthenticatedUser(
+        _authService,
+      );
+    } catch (_) {
+      // Native push cleanup is best-effort and must never block logout.
+    }
 
     try {
       await _authService.logout();
