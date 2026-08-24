@@ -35,11 +35,15 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _mapSearchController = TextEditingController();
+  final TextEditingController _barangayNameController = TextEditingController();
   final MapController _mapController = MapController();
 
   bool _loading = true;
   bool _submitting = false;
   bool _mapSearching = false;
+  bool _showAddBarangayPanel = false;
+  bool _addingBarangay = false;
+  String? _barangayAddError;
   String? _error;
   String _mapStatus = 'Search results will automatically move the map pin.';
 
@@ -69,14 +73,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   DateTime? _lastMapSearchAt;
   final Map<String, _MapSearchResult> _mapCache = <String, _MapSearchResult>{};
 
-  String get _role =>
-      widget.user['role']?.toString().trim().toLowerCase() ?? '';
-
-  bool get _canManageBarangays =>
-      _permissions['can_manage_barangays'] == true ||
-      _role == 'admin' ||
-      _role == 'official' ||
-      _role == 'dao';
+  bool get _canManageBarangays => _permissions['can_manage_barangays'] == true;
 
   @override
   void initState() {
@@ -90,6 +87,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     _descriptionController.dispose();
     _locationController.dispose();
     _mapSearchController.dispose();
+    _barangayNameController.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -163,52 +161,49 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
   }
 
-  Future<void> _addBarangay() async {
-    final controller = TextEditingController();
-
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Add Barangay'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 255,
-          decoration: const InputDecoration(
-            labelText: 'Barangay Name',
-            hintText: 'Enter barangay name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.isNotEmpty) {
-                Navigator.of(dialogContext).pop(value);
-              }
-            },
-            child: const Text('Save Barangay'),
-          ),
-        ],
-      ),
-    );
-
-    controller.dispose();
-
-    if (name == null || name.trim().isEmpty) {
+  void _toggleAddBarangayPanel() {
+    if (_addingBarangay) {
       return;
     }
 
+    setState(() {
+      _showAddBarangayPanel = !_showAddBarangayPanel;
+      _barangayAddError = null;
+
+      if (!_showAddBarangayPanel) {
+        _barangayNameController.clear();
+      }
+    });
+  }
+
+  Future<void> _saveBarangay() async {
+    if (_addingBarangay) {
+      return;
+    }
+
+    final name = _barangayNameController.text.trim();
+
+    if (name.isEmpty) {
+      setState(() {
+        _barangayAddError = 'Enter a barangay name first.';
+      });
+      return;
+    }
+
+    if (name.length > 255) {
+      setState(() {
+        _barangayAddError = 'Barangay name must not exceed 255 characters.';
+      });
+      return;
+    }
+
+    setState(() {
+      _addingBarangay = true;
+      _barangayAddError = null;
+    });
+
     try {
       final response = await widget.incidentService.addBarangay(name: name);
-
       final created = _map(response['data']);
       final createdId = _toInt(created['id']);
 
@@ -218,19 +213,42 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         return;
       }
 
-      if (createdId != null) {
-        setState(() {
+      final createdIsAvailable =
+          createdId != null && _containsId(_barangays, createdId);
+
+      setState(() {
+        _addingBarangay = false;
+        _showAddBarangayPanel = false;
+        _barangayAddError = null;
+        _barangayNameController.clear();
+
+        if (createdIsAvailable) {
           _barangayId = createdId;
-        });
-      }
+        }
+      });
 
       _showMessage(
         response['message']?.toString() ?? 'Barangay added successfully.',
       );
     } on AuthException catch (exception) {
-      if (mounted) {
-        _showMessage(exception.message);
+      if (!mounted) {
+        return;
       }
+
+      setState(() {
+        _addingBarangay = false;
+        _barangayAddError = exception.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _addingBarangay = false;
+        _barangayAddError =
+            'Unable to add barangay right now. Please try again.';
+      });
     }
   }
 
@@ -894,7 +912,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             children: <Widget>[
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _addBarangay,
+                  onPressed: _addingBarangay ? null : _toggleAddBarangayPanel,
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Add Barangay'),
                 ),
@@ -914,7 +932,71 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           ),
           const SizedBox(height: 12),
         ],
+        if (_canManageBarangays && _showAddBarangayPanel) ...<Widget>[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                TextField(
+                  controller: _barangayNameController,
+                  autofocus: true,
+                  maxLength: 255,
+                  textInputAction: TextInputAction.done,
+                  enabled: !_addingBarangay,
+                  onChanged: (_) {
+                    if (_barangayAddError != null) {
+                      setState(() {
+                        _barangayAddError = null;
+                      });
+                    }
+                  },
+                  onSubmitted: (_) {
+                    if (!_addingBarangay) {
+                      _saveBarangay();
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Barangay Name',
+                    hintText: 'Enter barangay name',
+                    errorText: _barangayAddError,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _addingBarangay ? null : _saveBarangay,
+                    icon: _addingBarangay
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save_rounded),
+                    label: Text(
+                      _addingBarangay ? 'Saving...' : 'Save Barangay',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         DropdownButtonFormField<int>(
+          key: ValueKey<int?>(_barangayId),
+
           initialValue: _barangayId,
           decoration: const InputDecoration(
             labelText: 'Barangay',
