@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../services/auth_service.dart';
 import '../services/notification_center_service.dart';
+import '../services/native_push_service.dart';
 
 typedef GlobalNotificationOpenCallback =
     Future<void> Function(NotificationOpenTarget target);
@@ -29,6 +30,7 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
   late final NotificationCenterService _service;
 
   Timer? _timer;
+  StreamSubscription<NativePushEvent>? _pushSubscription;
   bool _loading = true;
   bool _requestRunning = false;
   bool _pulseInitialized = false;
@@ -43,7 +45,20 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
 
     _service = NotificationCenterService(authService: widget.authService);
 
-    _initialLoad();
+    _pushSubscription = NativePushBridge.events.listen(_handleNativePushEvent);
+
+    unawaited(
+      _initialLoad().then((_) async {
+        if (!mounted) {
+          return;
+        }
+
+        final pendingId = NativePushBridge.takePendingOpenNotificationId();
+        if (pendingId != null) {
+          await _openNotificationById(pendingId);
+        }
+      }),
+    );
 
     _timer = Timer.periodic(_pollInterval, (_) => _poll());
   }
@@ -51,7 +66,67 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
   @override
   void dispose() {
     _timer?.cancel();
+    _pushSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleNativePushEvent(NativePushEvent event) async {
+    if (event.openRequested) {
+      final id = event.notificationId;
+      NativePushBridge.clearPendingOpenNotificationId(id);
+
+      if (id != null) {
+        await _openNotificationById(id);
+      }
+
+      return;
+    }
+
+    if (event.notificationId != null && event.notificationId! > _latestId) {
+      _latestId = event.notificationId!;
+    }
+
+    if (event.isEmergency &&
+        event.notificationId != null &&
+        event.notificationId! > _latestEmergencyId) {
+      _latestEmergencyId = event.notificationId!;
+    }
+
+    await _loadBell();
+
+    if (!mounted || event.notificationId == null) {
+      return;
+    }
+
+    Map<String, dynamic>? notification;
+
+    for (final item in _notifications) {
+      if (_asInt(item['id']) == event.notificationId) {
+        notification = item;
+        break;
+      }
+    }
+
+    if (notification == null) {
+      return;
+    }
+
+    if (event.isEmergency) {
+      await _playUrgentEmergencyFeedback();
+
+      if (mounted) {
+        _showEmergencyBanner(notification);
+      }
+
+      return;
+    }
+
+    await SystemSound.play(SystemSoundType.alert);
+    await HapticFeedback.lightImpact();
+
+    if (mounted) {
+      _showNotificationBanner(notification);
+    }
   }
 
   Future<void> _initialLoad() async {
@@ -315,6 +390,14 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
   Future<void> _openNotification(Map<String, dynamic> notification) async {
     final id = _asInt(notification['id']);
 
+    if (id <= 0) {
+      return;
+    }
+
+    await _openNotificationById(id);
+  }
+
+  Future<void> _openNotificationById(int id) async {
     if (id <= 0) {
       return;
     }
