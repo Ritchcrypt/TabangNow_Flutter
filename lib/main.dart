@@ -5,6 +5,7 @@ import 'core/global_theme_controller.dart';
 import 'widgets/global_sos_overlay.dart';
 
 import 'screens/auth_gate.dart';
+import 'widgets/mobile_update_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,7 +51,7 @@ class TabangNowApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: const MobileUpdateGate(child: AuthGate()),
     );
   }
 }
