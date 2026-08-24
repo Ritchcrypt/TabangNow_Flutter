@@ -109,7 +109,7 @@ class NativePushService {
     defaultValue: 'http://127.0.0.1:8000',
   );
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messaging;
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final http.Client _client = http.Client();
 
@@ -135,17 +135,20 @@ class NativePushService {
         );
       }
 
+      final messaging = FirebaseMessaging.instance;
+      _messaging = messaging;
+
       FirebaseMessaging.onBackgroundMessage(
         tabangNowFirebaseMessagingBackgroundHandler,
       );
 
-      await _messaging.setAutoInitEnabled(true);
+      await messaging.setAutoInitEnabled(true);
 
       FirebaseMessaging.onMessage.listen(NativePushBridge.received);
 
       FirebaseMessaging.onMessageOpenedApp.listen(NativePushBridge.opened);
 
-      _messaging.onTokenRefresh.listen((token) {
+      messaging.onTokenRefresh.listen((token) {
         final authService = _authenticatedAuthService;
 
         if (authService != null && token.trim().isNotEmpty) {
@@ -153,7 +156,7 @@ class NativePushService {
         }
       });
 
-      final initialMessage = await _messaging.getInitialMessage();
+      final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
         NativePushBridge.opened(initialMessage);
       }
@@ -162,19 +165,22 @@ class NativePushService {
     } catch (_) {
       // Native push must fail open. The existing Laravel notification center
       // and 15-second in-app polling remain the fallback notification path.
+      _messaging = null;
       _ready = false;
     }
   }
 
   Future<void> syncForAuthenticatedUser(AuthService authService) async {
-    if (!_ready) {
+    final messaging = _messaging;
+
+    if (!_ready || messaging == null) {
       return;
     }
 
     _authenticatedAuthService = authService;
 
     try {
-      final settings = await _messaging.requestPermission(
+      final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -185,7 +191,7 @@ class NativePushService {
         return;
       }
 
-      final token = (await _messaging.getToken())?.trim() ?? '';
+      final token = (await messaging.getToken())?.trim() ?? '';
 
       if (token.isEmpty) {
         return;
@@ -199,7 +205,9 @@ class NativePushService {
   }
 
   Future<void> unregisterForAuthenticatedUser(AuthService authService) async {
-    if (!_ready) {
+    final messaging = _messaging;
+
+    if (!_ready || messaging == null) {
       _authenticatedAuthService = null;
       return;
     }
@@ -213,7 +221,7 @@ class NativePushService {
     _authenticatedAuthService = null;
 
     try {
-      await _messaging.deleteToken();
+      await messaging.deleteToken();
     } catch (_) {
       // Logout must never be blocked by Firebase cleanup.
     }

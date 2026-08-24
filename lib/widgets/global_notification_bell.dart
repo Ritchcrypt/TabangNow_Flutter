@@ -26,6 +26,9 @@ class GlobalNotificationBell extends StatefulWidget {
 
 class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
   static const Duration _pollInterval = Duration(seconds: 15);
+  static const MethodChannel _notificationFeedbackChannel = MethodChannel(
+    'tabangnow/notification_feedback',
+  );
 
   late final NotificationCenterService _service;
 
@@ -121,8 +124,7 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
       return;
     }
 
-    await SystemSound.play(SystemSoundType.alert);
-    await HapticFeedback.lightImpact();
+    await _playStandardNotificationFeedback();
 
     if (mounted) {
       _showNotificationBanner(notification);
@@ -170,8 +172,7 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
       return;
     }
 
-    await SystemSound.play(SystemSoundType.alert);
-    await HapticFeedback.lightImpact();
+    await _playStandardNotificationFeedback();
 
     if (mounted) {
       _showNotificationBanner(latest, initialUnreadCount: _unreadCount);
@@ -241,15 +242,26 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
     }
   }
 
-  Future<void> _playUrgentEmergencyFeedback() async {
-    await SystemSound.play(SystemSoundType.alert);
-    await HapticFeedback.heavyImpact();
-    await Future<void>.delayed(const Duration(milliseconds: 320));
-    await SystemSound.play(SystemSoundType.alert);
-    await HapticFeedback.heavyImpact();
-    await Future<void>.delayed(const Duration(milliseconds: 320));
+  Future<void> _playStandardNotificationFeedback() async {
+    try {
+      await _notificationFeedbackChannel.invokeMethod<void>(
+        'playNotificationFeedback',
+      );
+      return;
+    } catch (_) {
+      // Fall back to Flutter feedback if native Android playback is unavailable.
+    }
+
     await SystemSound.play(SystemSoundType.alert);
     await HapticFeedback.mediumImpact();
+  }
+
+  Future<void> _playUrgentEmergencyFeedback() async {
+    // Keep one notification-sound implementation across every foreground
+    // notification type. The Android native side owns the TabangNow custom
+    // sound and vibration pattern; this avoids falling back to the phone's
+    // unrelated system notification tone for emergency events.
+    await _playStandardNotificationFeedback();
   }
 
   void _showEmergencyBanner(Object? rawNotification) {
