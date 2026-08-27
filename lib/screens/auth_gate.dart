@@ -214,7 +214,11 @@ class _AuthGateState extends State<AuthGate> {
               constraints: const BoxConstraints(maxWidth: 560),
               child: Column(
                 children: <Widget>[
-                  const SosFlipCoinButton(size: 104),
+                  const SosFlipCoinButton(
+                    size: 148,
+                    showShadow: false,
+                    logoFit: BoxFit.contain,
+                  ),
                   const SizedBox(height: 24),
                   const Text(
                     'TabangNow',
@@ -250,16 +254,6 @@ class _AuthGateState extends State<AuthGate> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          const Text(
-                            'Secure Access',
-                            style: TextStyle(
-                              color: Color(0xFF2F6FED),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
                           const Text(
                             'Log in to your account',
                             style: TextStyle(
@@ -306,6 +300,25 @@ class _AuthGateState extends State<AuthGate> {
                             },
                           ),
                           const SizedBox(height: 20),
+                          // tabangnow_password_help_position_v2
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 8,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: _loggingIn
+                                  ? null
+                                  : _openForgotPassword,
+                              child: const Text('Forgot your password?'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
@@ -340,6 +353,8 @@ class _AuthGateState extends State<AuthGate> {
                           const SizedBox(height: 14),
                           Row(
                             children: <Widget>[
+                              // tabangnow_login_layout_patch_v1
+                              const SizedBox(height: 8),
                               Padding(
                                 padding: const EdgeInsets.only(left: 2),
                                 child: Checkbox(
@@ -375,20 +390,7 @@ class _AuthGateState extends State<AuthGate> {
                           const SizedBox(height: 4),
                           Align(
                             alignment: Alignment.centerRight,
-                            child: TextButton(
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 8,
-                                ),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: _loggingIn
-                                  ? null
-                                  : _openForgotPassword,
-                              child: const Text('Forgot your password?'),
-                            ),
+                            child: const SizedBox.shrink(),
                           ),
                           if (_loginError != null) ...<Widget>[
                             const SizedBox(height: 14),
@@ -461,14 +463,6 @@ class _AuthGateState extends State<AuthGate> {
                     ),
                   ),
                   const SizedBox(height: 36),
-                  const Text(
-                    'TabangNow  •  Dao, Capiz',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
                 ],
               ),
             ),

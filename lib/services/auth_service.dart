@@ -189,6 +189,32 @@ class AuthService {
     );
   }
 
+
+  Future<void> presenceHeartbeat() async {
+    final token = await getToken();
+
+    if (token == null || token.isEmpty) {
+      return;
+    }
+
+    try {
+      await _client
+          .post(
+            Uri.parse('$_baseUrl/api/v1/presence/heartbeat'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      // Presence is best-effort and must never interrupt the app.
+    } on SocketException {
+      // A temporary network loss naturally ages the user offline.
+    } on http.ClientException {
+      // Presence is informational; normal authenticated requests own errors.
+    }
+  }
   Future<Map<String, dynamic>> dashboard() {
     return _authorizedGet('/api/v1/dashboard');
   }

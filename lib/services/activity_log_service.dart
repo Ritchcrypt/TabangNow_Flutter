@@ -56,6 +56,15 @@ class ActivityLogService {
     return _request(() async => _client.get(uri, headers: await _headers()));
   }
 
+  Future<Map<String, dynamic>> deleteAll() {
+    return _request(
+      () async => _client.delete(
+        Uri.parse('$baseUrl/api/v1/activity-logs'),
+        headers: await _headers(),
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> show(int activityLogId) {
     return _request(
       () async => _client.get(

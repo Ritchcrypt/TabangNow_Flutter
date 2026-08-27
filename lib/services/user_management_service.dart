@@ -62,6 +62,15 @@ class UserManagementService {
     );
   }
 
+
+  Future<Map<String, dynamic>> presence() {
+    return _jsonRequest(
+      () async => _client.get(
+        Uri.parse('$baseUrl/api/v1/presence/users'),
+        headers: await _headers(),
+      ),
+    );
+  }
   Future<Map<String, dynamic>> show(int userId) {
     return _jsonRequest(
       () async => _client.get(

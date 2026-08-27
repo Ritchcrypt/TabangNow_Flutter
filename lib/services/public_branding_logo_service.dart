@@ -11,6 +11,8 @@ class PublicBrandingLogoService {
     defaultValue: 'http://127.0.0.1:8000',
   );
 
+  static const Duration _requestTimeout = Duration(seconds: 10);
+
   final http.Client _client;
 
   Future<Uint8List?> fetchLogoBytes() async {
@@ -20,13 +22,15 @@ class PublicBrandingLogoService {
       },
     );
 
-    final response = await _client.get(
-      uri,
-      headers: const <String, String>{
-        'Accept': 'image/png,image/jpeg,image/webp,image/*;q=0.8,*/*;q=0.1',
-        'Cache-Control': 'no-cache',
-      },
-    );
+    final response = await _client
+        .get(
+          uri,
+          headers: const <String, String>{
+            'Accept': 'image/png,image/jpeg,image/webp,image/*;q=0.8,*/*;q=0.1',
+            'Cache-Control': 'no-cache',
+          },
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 404) {
       return null;
@@ -39,7 +43,7 @@ class PublicBrandingLogoService {
       );
     }
 
-    final bytes = response.bodyBytes;
+    var bytes = Uint8List.fromList(response.bodyBytes);
 
     if (bytes.isEmpty) {
       return null;
@@ -49,10 +53,48 @@ class PublicBrandingLogoService {
         bytes[0] == 0xEF &&
         bytes[1] == 0xBB &&
         bytes[2] == 0xBF) {
-      return Uint8List.fromList(bytes.sublist(3));
+      bytes = Uint8List.fromList(bytes.sublist(3));
     }
 
-    return Uint8List.fromList(bytes);
+    if (!_looksLikeSupportedImage(bytes)) {
+      throw const PublicBrandingLogoException(
+        'The TabangNow logo response was not a supported image.',
+      );
+    }
+
+    return bytes;
+  }
+
+  bool _looksLikeSupportedImage(Uint8List bytes) {
+    final isPng =
+        bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A;
+
+    final isJpeg =
+        bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF;
+
+    final isWebp =
+        bytes.length >= 12 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50;
+
+    return isPng || isJpeg || isWebp;
   }
 }
 

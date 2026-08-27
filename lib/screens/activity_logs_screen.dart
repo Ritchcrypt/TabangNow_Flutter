@@ -27,6 +27,8 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
   final _searchController = TextEditingController();
 
   bool _loading = true;
+  bool _deletingAll = false;
+  bool _canDeleteAll = false;
   String? _error;
 
   List<Map<String, dynamic>> _logs = <Map<String, dynamic>>[];
@@ -104,6 +106,8 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
         _logs = _mapList(response['data']);
 
         _options = _map(response['options']);
+
+        _canDeleteAll = _map(response['permissions'])['can_delete_all'] == true;
 
         _page = _int(pagination['current_page'], fallback: page);
 
@@ -419,6 +423,102 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
     await _load(page: 1);
   }
 
+  Future<void> _deleteAllPermanently() async {
+    if (_deletingAll || !_canDeleteAll) {
+      return;
+    }
+
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Delete all activity logs permanently?'),
+              content: const Text(
+                'This will permanently remove the complete Activity Logs audit trail, not only the records shown by the current search or filters. This cannot be undone. New system activity will start creating fresh logs afterward.',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB91C1C),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  icon: const Icon(Icons.delete_forever_outlined),
+                  label: const Text('Delete All Permanently'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _deletingAll = true;
+    });
+
+    try {
+      final response = await _service.deleteAll();
+
+      if (!mounted) {
+        return;
+      }
+
+      _searchController.clear();
+
+      setState(() {
+        _category = '';
+        _event = '';
+        _actorId = null;
+        _dateFrom = '';
+        _dateTo = '';
+        _perPage = 50;
+        _page = 1;
+      });
+
+      await _load(page: 1);
+
+      if (!mounted) {
+        return;
+      }
+
+      final message = _text(
+        response['message'],
+        'Activity logs were permanently deleted.',
+      );
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                exception.toString().replaceFirst('AuthException: ', ''),
+              ),
+            ),
+          );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingAll = false;
+        });
+      }
+    }
+  }
+
   Future<void> _openLog(int activityLogId) async {
     if (activityLogId <= 0) {
       return;
@@ -486,7 +586,7 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Review authentication, account-management, incident, complaint, tanod, announcement, configuration, and security events. Activity logs are read-only.',
+                      'Review authentication, account-management, incident, complaint, tanod, announcement, configuration, and security events. Individual log records are read-only; administrators can permanently clear the full audit trail.',
                       style: TextStyle(color: palette.textMuted, height: 1.45),
                     ),
                   ],
@@ -577,6 +677,37 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                     ),
                   ],
                 ),
+                if (_canDeleteAll) ...<Widget>[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFB91C1C),
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 13,
+                        ),
+                      ),
+                      onPressed: _loading || _deletingAll
+                          ? null
+                          : _deleteAllPermanently,
+                      icon: _deletingAll
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_forever_outlined),
+                      label: Text(
+                        _deletingAll
+                            ? 'Deleting Activity Logs...'
+                            : 'Delete All Permanently',
+                      ),
+                    ),
+                  ),
+                ],
                 if (_hasFilters) ...<Widget>[
                   const SizedBox(height: 10),
                   Align(

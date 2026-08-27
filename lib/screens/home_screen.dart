@@ -33,7 +33,6 @@ import 'reports_screen.dart';
 import 'user_management_screen.dart';
 import 'activity_logs_screen.dart';
 import 'current_account_profile_screen.dart';
-import 'login_screen.dart';
 import 'resident_complaint_detail_screen.dart';
 import 'resident_complaints_screen.dart';
 import 'tanod_roster_screen.dart';
@@ -88,7 +87,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const Color _navy = Color(0xFF172554);
   Color get _activeBlue => Theme.of(context).colorScheme.primary;
   Color get _contentBackground => Theme.of(context).scaffoldBackgroundColor;
@@ -106,6 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _dashboardLoading = true;
   bool _loggingOut = false;
   int _profileRevision = 0;
+
+  static const Duration _presenceHeartbeatInterval = Duration(seconds: 45);
+  Timer? _presenceHeartbeatTimer;
 
   String? _dashboardError;
 
@@ -125,11 +127,50 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _brandingService = BrandingService(authService: _authService);
+    _startPresenceHeartbeat();
     unawaited(
       NativePushService.instance.syncForAuthenticatedUser(_authService),
     );
     _loadInitialData();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPresenceHeartbeat();
+      return;
+    }
+
+    _presenceHeartbeatTimer?.cancel();
+    _presenceHeartbeatTimer = null;
+  }
+
+  void _startPresenceHeartbeat() {
+    _presenceHeartbeatTimer?.cancel();
+
+    unawaited(_sendPresenceHeartbeat());
+
+    _presenceHeartbeatTimer = Timer.periodic(
+      _presenceHeartbeatInterval,
+      (_) => unawaited(_sendPresenceHeartbeat()),
+    );
+  }
+
+  Future<void> _sendPresenceHeartbeat() async {
+    try {
+      await _authService.presenceHeartbeat();
+    } catch (_) {
+      // Presence is best-effort. Normal app requests own auth/network errors.
+    }
+  }
+
+  @override
+  void dispose() {
+    _presenceHeartbeatTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -236,6 +277,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    _presenceHeartbeatTimer?.cancel();
+    _presenceHeartbeatTimer = null;
+
     final scaffoldState = _scaffoldKey.currentState;
 
     if (scaffoldState != null && scaffoldState.isDrawerOpen) {
@@ -266,10 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
   void _selectModule(_HomeModule module) {
@@ -365,10 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       return;
     }
 
@@ -454,6 +492,15 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         break;
+
+      case 'caseManagement':
+        if (ModuleRegistry.canAccess(_appRole, AppModuleId.caseManagement)) {
+          _selectModule(_HomeModule.caseManagement);
+          return;
+        }
+
+        _selectModule(_HomeModule.dashboard);
+        return;
 
       case 'announcements':
         _selectModule(_HomeModule.announcements);
