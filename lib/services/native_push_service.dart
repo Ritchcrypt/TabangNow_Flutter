@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -101,6 +102,9 @@ class NativePushService {
 
   static final NativePushService instance = NativePushService._();
 
+  static const MethodChannel _notificationFeedbackChannel = MethodChannel(
+    'tabangnow/notification_feedback',
+  );
   static const String _installationIdKey =
       'tabangnow_emergency_installation_id';
   static const Duration _requestTimeout = Duration(seconds: 15);
@@ -144,7 +148,23 @@ class NativePushService {
 
       await messaging.setAutoInitEnabled(true);
 
-      FirebaseMessaging.onMessage.listen(NativePushBridge.received);
+      // Request Android notification permission during app startup so
+      // Android 13+ users receive the system prompt independently of login.
+      // FCM token registration remains tied to authenticated user sync.
+      try {
+        await messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      } catch (_) {
+        // Permission prompting must never block Firebase/app startup.
+      }
+
+      FirebaseMessaging.onMessage.listen((message) {
+        NativePushBridge.received(message);
+        unawaited(_playForegroundNotificationFeedback());
+      });
 
       FirebaseMessaging.onMessageOpenedApp.listen(NativePushBridge.opened);
 
@@ -227,6 +247,20 @@ class NativePushService {
     }
   }
 
+
+  Future<void> _playForegroundNotificationFeedback() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+
+    try {
+      await _notificationFeedbackChannel.invokeMethod<void>(
+        'playNotificationFeedback',
+      );
+    } catch (_) {
+      // Sound/vibration feedback must never block notification delivery.
+    }
+  }
   Future<void> _registerToken(String fcmToken, AuthService authService) async {
     final authToken = (await authService.getToken())?.trim() ?? '';
 

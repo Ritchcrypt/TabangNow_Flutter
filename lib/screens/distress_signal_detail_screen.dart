@@ -82,6 +82,82 @@ class _DistressSignalDetailScreenState
     await _changeState(() => _service.resolve(widget.alertId));
   }
 
+  Future<void> _delete() async {
+    if (_changingState) {
+      return;
+    }
+
+    final code = _text(_alert['alert_code'], 'this distress signal');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete distress signal?'),
+          content: Text(
+            'Delete $code from the responder module? This cannot be undone.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB91C1C),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _changingState = true;
+    });
+
+    try {
+      await _service.delete(widget.alertId);
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop();
+    } on AuthException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _changingState = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(exception.message)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _changingState = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Unable to delete distress signal.')),
+        );
+    }
+  }
+
   Future<void> _changeState(
     Future<Map<String, dynamic>> Function() action,
   ) async {
@@ -314,6 +390,14 @@ class _DistressSignalDetailScreenState
                   onPressed: _changingState ? null : _resolve,
                   child: const Text('Mark Resolved'),
                 ),
+              OutlinedButton.icon(
+                onPressed: _changingState ? null : _delete,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Delete Distress Signal'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFB91C1C),
+                ),
+              ),
             ],
           ),
           if (_changingState) ...<Widget>[

@@ -57,6 +57,32 @@ class DistressSignalService {
     return _stateChange(alertId, 'resolve');
   }
 
+  Future<void> delete(int alertId) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/api/v1/emergency-alerts/$alertId'),
+      headers: await _headers(),
+    );
+
+    await _decodeAuthorized(response);
+  }
+
+  Future<int> deleteAll() async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/api/v1/emergency-alerts'),
+      headers: await _headers(),
+    );
+
+    final payload = await _decodeAuthorized(response);
+    final rawData = payload['data'];
+
+    if (rawData is! Map) {
+      return 0;
+    }
+
+    final data = Map<String, dynamic>.from(rawData);
+    return int.tryParse(data['deleted_count']?.toString() ?? '') ?? 0;
+  }
+
   Future<Map<String, dynamic>> _stateChange(int alertId, String action) async {
     final response = await _client.patch(
       Uri.parse('$baseUrl/api/v1/emergency-alerts/$alertId/$action'),

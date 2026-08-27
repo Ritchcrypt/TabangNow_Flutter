@@ -134,6 +134,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _SpecificReportKind.incident => _mapList(reportOptions['incidents']),
       _SpecificReportKind.caseRecord => _mapList(reportOptions['cases']),
       _SpecificReportKind.complaint => _mapList(reportOptions['complaints']),
+      _SpecificReportKind.sos => _mapList(reportOptions['sos']),
     };
 
     if (options.isEmpty) {
@@ -159,6 +160,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _SpecificReportKind.incident => _service.incidentPdf(selectedId),
         _SpecificReportKind.caseRecord => _service.casePdf(selectedId),
         _SpecificReportKind.complaint => _service.complaintPdf(selectedId),
+        _SpecificReportKind.sos => _service.sosPdf(selectedId),
       },
     );
   }
@@ -321,6 +323,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             onCase: () => _selectSpecificPdf(_SpecificReportKind.caseRecord),
             onComplaint: () =>
                 _selectSpecificPdf(_SpecificReportKind.complaint),
+            onSos: () => _selectSpecificPdf(_SpecificReportKind.sos),
             onPeriod: _downloadPeriodPdf,
           ),
 
@@ -477,6 +480,7 @@ class _PdfActionsCard extends StatelessWidget {
     required this.onIncident,
     required this.onCase,
     required this.onComplaint,
+    required this.onSos,
     required this.onPeriod,
   });
 
@@ -484,6 +488,7 @@ class _PdfActionsCard extends StatelessWidget {
   final VoidCallback onIncident;
   final VoidCallback onCase;
   final VoidCallback onComplaint;
+  final VoidCallback onSos;
   final VoidCallback onPeriod;
 
   @override
@@ -550,6 +555,11 @@ class _PdfActionsCard extends StatelessWidget {
                 onPressed: busy ? null : onComplaint,
                 icon: const Icon(Icons.chat_bubble_outline_rounded),
                 label: const Text('Complaint PDF'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : onSos,
+                icon: const Icon(Icons.emergency_outlined),
+                label: const Text('SOS PDF'),
               ),
               FilledButton.icon(
                 onPressed: busy ? null : onPeriod,
@@ -935,24 +945,28 @@ class _ErrorCard extends StatelessWidget {
 enum _SpecificReportKind {
   incident,
   caseRecord,
-  complaint;
+  complaint,
+  sos;
 
   String get title => switch (this) {
     _SpecificReportKind.incident => 'Incident Report',
     _SpecificReportKind.caseRecord => 'Case Report',
     _SpecificReportKind.complaint => 'Complaint Report',
+    _SpecificReportKind.sos => 'SOS / Distress Signal Report',
   };
 
   String get singularLabel => switch (this) {
     _SpecificReportKind.incident => 'incident',
     _SpecificReportKind.caseRecord => 'case',
     _SpecificReportKind.complaint => 'complaint',
+    _SpecificReportKind.sos => 'SOS / Distress Signal',
   };
 
   String get pluralLabel => switch (this) {
     _SpecificReportKind.incident => 'Incidents',
     _SpecificReportKind.caseRecord => 'Cases',
     _SpecificReportKind.complaint => 'Complaints',
+    _SpecificReportKind.sos => 'SOS / Distress Signals',
   };
 }
 

@@ -16,7 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val notificationChannelId = "tabangnow_notifications_v2"
+        private const val notificationChannelId = "tabangnow_notifications_v3"
         private const val notificationFeedbackChannel =
             "tabangnow/notification_feedback"
     }

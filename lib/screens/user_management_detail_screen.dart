@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -25,7 +26,11 @@ class _UserManagementDetailScreenState
     extends State<UserManagementDetailScreen> {
   bool _loading = true;
   bool _busy = false;
+  bool _presenceRefreshing = false;
   String? _error;
+
+  static const Duration _presencePollInterval = Duration(seconds: 30);
+  Timer? _presenceTimer;
 
   Map<String, dynamic> _user = <String, dynamic>{};
 
@@ -37,6 +42,17 @@ class _UserManagementDetailScreenState
   void initState() {
     super.initState();
     _load();
+
+    _presenceTimer = Timer.periodic(
+      _presencePollInterval,
+      (_) => _refreshPresence(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _presenceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -70,6 +86,43 @@ class _UserManagementDetailScreenState
         _loading = false;
         _error = exception.toString().replaceFirst('AuthException: ', '');
       });
+    }
+  }
+
+  Future<void> _refreshPresence() async {
+    if (_presenceRefreshing ||
+        !mounted ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+
+    _presenceRefreshing = true;
+
+    try {
+      final response = await widget.service.presence();
+
+      if (!mounted) {
+        return;
+      }
+
+      final users = _map(response['users']);
+      final presence = _map(users[widget.userId.toString()]);
+
+      if (presence.isEmpty) {
+        return;
+      }
+
+      setState(() {
+        _user = <String, dynamic>{
+          ..._user,
+          'online': presence['online'] == true,
+          'last_seen_at': presence['last_seen_at'],
+        };
+      });
+    } catch (_) {
+      // Keep the already-loaded User detail during temporary poll failures.
+    } finally {
+      _presenceRefreshing = false;
     }
   }
 

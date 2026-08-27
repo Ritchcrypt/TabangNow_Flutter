@@ -22,6 +22,7 @@ class _DistressSignalScreenState extends State<DistressSignalScreen> {
   late final DistressSignalService _service;
 
   bool _loading = true;
+  bool _deleting = false;
   String? _error;
   List<Map<String, dynamic>> _alerts = <Map<String, dynamic>>[];
 
@@ -67,6 +68,187 @@ class _DistressSignalScreenState extends State<DistressSignalScreen> {
         _loading = false;
         _error = 'Unable to load distress signals.';
       });
+    }
+  }
+
+  Future<void> _deleteAlert(Map<String, dynamic> alert) async {
+    if (_deleting) {
+      return;
+    }
+
+    final id = _asInt(alert['id']);
+    if (id <= 0) {
+      return;
+    }
+
+    final code = _text(alert['alert_code'], 'this distress signal');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete distress signal?'),
+          content: Text(
+            'Delete $code from the responder module? This cannot be undone.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB91C1C),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _deleting = true;
+    });
+
+    try {
+      await _service.delete(id);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _alerts.removeWhere((item) => _asInt(item['id']) == id);
+        _deleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Distress signal deleted.')),
+        );
+    } on AuthException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _deleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(exception.message)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _deleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Unable to delete distress signal.')),
+        );
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    if (_deleting || _alerts.isEmpty) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete all distress signals?'),
+          content: const Text(
+            'This removes all active, acknowledged, and resolved distress '
+            'signals from the responder module. This cannot be undone.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB91C1C),
+              ),
+              child: const Text('Delete All'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _deleting = true;
+    });
+
+    try {
+      final deleted = await _service.deleteAll();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _alerts = <Map<String, dynamic>>[];
+        _deleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              deleted == 1
+                  ? '1 distress signal deleted.'
+                  : '$deleted distress signals deleted.',
+            ),
+          ),
+        );
+    } on AuthException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _deleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(exception.message)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _deleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Unable to delete distress signals.')),
+        );
     }
   }
 
@@ -185,6 +367,20 @@ class _DistressSignalScreenState extends State<DistressSignalScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          if (_alerts.isNotEmpty) ...<Widget>[
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: _deleting ? null : _deleteAll,
+                icon: const Icon(Icons.delete_sweep_outlined),
+                label: const Text('Delete All'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFB91C1C),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           if (_alerts.isEmpty)
             Container(
               padding: const EdgeInsets.all(28),
@@ -211,7 +407,9 @@ class _DistressSignalScreenState extends State<DistressSignalScreen> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _DistressSignalCard(
                   alert: alert,
+                  deleting: _deleting,
                   onTap: () => _open(alert),
+                  onDelete: () => _deleteAlert(alert),
                 ),
               ),
             ),
@@ -222,10 +420,17 @@ class _DistressSignalScreenState extends State<DistressSignalScreen> {
 }
 
 class _DistressSignalCard extends StatelessWidget {
-  const _DistressSignalCard({required this.alert, required this.onTap});
+  const _DistressSignalCard({
+    required this.alert,
+    required this.deleting,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final Map<String, dynamic> alert;
+  final bool deleting;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -280,6 +485,16 @@ class _DistressSignalCard extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    onPressed: deleting ? null : onDelete,
+                    tooltip: 'Delete distress signal',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFB91C1C),
                     ),
                   ),
                 ],

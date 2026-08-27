@@ -153,16 +153,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                             const Text(
-                              'Secure Access',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.2,
-                                color: Color(0xFF2563EB),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
                               'Log in to your account',
                               style: TextStyle(
                                 fontSize: 24,
@@ -369,11 +359,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'TabangNow \u2022 Dao, Capiz',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
                 ],
               ),
             ),
@@ -447,10 +432,7 @@ class _AuthenticatedScreenState extends State<AuthenticatedScreen> {
         return;
       }
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (_) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } on AuthException catch (error) {
       if (!mounted) {
         return;

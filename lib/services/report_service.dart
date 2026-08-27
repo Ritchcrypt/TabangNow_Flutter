@@ -63,6 +63,13 @@ class ReportService {
     );
   }
 
+  Future<DownloadedReportPdf> sosPdf(int alertId) {
+    return _pdfRequest(
+      Uri.parse('$baseUrl/api/v1/reports/sos/$alertId/pdf'),
+      fallbackFileName: 'sos-report-$alertId.pdf',
+    );
+  }
+
   Future<DownloadedReportPdf> _pdfRequest(
     Uri uri, {
     required String fallbackFileName,

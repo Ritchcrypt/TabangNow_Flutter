@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -34,7 +35,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   bool _loading = true;
   bool _exporting = false;
+  bool _presenceRefreshing = false;
   String? _error;
+
+  static const Duration _presencePollInterval = Duration(seconds: 30);
+  Timer? _presenceTimer;
 
   List<Map<String, dynamic>> _users = <Map<String, dynamic>>[];
 
@@ -66,10 +71,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     _service = UserManagementService(authService: widget.authService);
 
     _load();
+    _startPresencePolling();
   }
 
   @override
   void dispose() {
+    _presenceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -132,6 +139,69 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         _loading = false;
         _error = exception.toString().replaceFirst('AuthException: ', '');
       });
+    }
+  }
+
+  void _startPresencePolling() {
+    _presenceTimer?.cancel();
+
+    _presenceTimer = Timer.periodic(
+      _presencePollInterval,
+      (_) => _refreshPresence(),
+    );
+  }
+
+  Future<void> _refreshPresence() async {
+    if (!_canManageUsers ||
+        _presenceRefreshing ||
+        !mounted ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+
+    _presenceRefreshing = true;
+
+    try {
+      final response = await _service.presence();
+
+      if (!mounted) {
+        return;
+      }
+
+      final presenceByUser = _map(response['users']);
+      final presenceSummary = _map(response['summary']);
+
+      setState(() {
+        _users = _users
+            .map((user) {
+              final id = _int(user['id']);
+              final presence = _map(presenceByUser[id.toString()]);
+
+              if (id <= 0 || presence.isEmpty) {
+                return user;
+              }
+
+              return <String, dynamic>{
+                ...user,
+                'online': presence['online'] == true,
+                'last_seen_at': presence['last_seen_at'],
+              };
+            })
+            .toList(growable: false);
+
+        if (presenceSummary.isNotEmpty) {
+          _summary = <String, dynamic>{
+            ..._summary,
+            'online': _int(presenceSummary['online']),
+            'offline': _int(presenceSummary['offline']),
+          };
+        }
+      });
+    } catch (_) {
+      // Presence polling is best-effort and must not replace the loaded list
+      // with an error screen if the network briefly drops.
+    } finally {
+      _presenceRefreshing = false;
     }
   }
 

@@ -66,7 +66,7 @@ void main() {
   });
 
   test(
-    'Activity Logs screen replicates website read-only filters and rows',
+    'Activity Logs screen replicates website filters and rows',
     () {
       final screen = File(
         'lib/screens/activity_logs_screen.dart',
@@ -75,7 +75,6 @@ void main() {
       for (final marker in <String>[
         'SECURITY AUDIT TRAIL',
         "'Activity Logs'",
-        'Activity logs are read-only.',
         'Actor, event, description, route, or IP',
         'All categories',
         'All events',
@@ -92,6 +91,7 @@ void main() {
         'View activity log',
         'No activity logs matched the selected filters.',
         'Clear the filters or choose a wider date range.',
+        '_deleteAllPermanently',
       ]) {
         expect(
           screen,
