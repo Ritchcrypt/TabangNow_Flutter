@@ -162,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       await _authService.presenceHeartbeat();
     } catch (_) {
-      // Presence is best-effort. Normal app requests own auth/network errors.
     }
   }
 
@@ -207,7 +206,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _systemLogoBytes = logoBytes;
       });
     } catch (_) {
-      // Keep the established TabangNow fallback branding.
     }
   }
 
@@ -295,14 +293,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _authService,
       );
     } catch (_) {
-      // Native push cleanup is best-effort and must never block logout.
     }
 
     try {
       await _authService.logout();
     } catch (_) {
-      // AuthService.logout clears the local secure token in a finally block.
-      // If remote revocation cannot be confirmed, this device still signs out.
       await _authService.clearToken();
     }
 
@@ -424,8 +419,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         refreshedIdentity.addAll(Map<String, dynamic>.from(rawUser));
       }
     } catch (_) {
-      // The self-profile API already saved the data. A follow-up identity
-      // refresh failure must not roll the visible account back.
     }
 
     if (mounted) {

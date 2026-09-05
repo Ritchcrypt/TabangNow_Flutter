@@ -19,9 +19,6 @@ class SosFlipCoinButton extends StatefulWidget {
   final bool showShadow;
   final BoxFit logoFit;
 
-  // Retained for source compatibility with existing call sites. Automatic
-  // logo-to-SOS flipping is intentionally disabled so system branding remains
-  // continuously visible.
   final Duration flipInterval;
 
   @override
@@ -144,9 +141,6 @@ class _LogoFace extends StatelessWidget {
   }
 
   Widget _bundledLogo() {
-    // The obsolete blue house/shield-with-cross logo has been retired.
-    // Keep a neutral, non-logo fallback so the SOS tap target remains visible
-    // when no custom barangay branding is available.
     return DecoratedBox(
       decoration: const BoxDecoration(
         shape: BoxShape.circle,

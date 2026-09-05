@@ -247,14 +247,15 @@ class IncidentService {
       return response.bodyBytes;
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      await authService.clearToken();
-    }
+    final data = _decodeJson(response.body);
+    final message = _extractErrorMessage(data);
 
-    throw AuthException(
-      _extractErrorMessage(_decodeJson(response.body)),
+    await authService.handleAuthorizationFailure(
       statusCode: response.statusCode,
+      message: message,
     );
+
+    throw AuthException(message, statusCode: response.statusCode);
   }
 
   Future<Map<String, String>> _jsonHeaders() async {
@@ -301,14 +302,14 @@ class IncidentService {
       return data;
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      await authService.clearToken();
-    }
+    final message = _extractErrorMessage(data);
 
-    throw AuthException(
-      _extractErrorMessage(data),
+    await authService.handleAuthorizationFailure(
       statusCode: response.statusCode,
+      message: message,
     );
+
+    throw AuthException(message, statusCode: response.statusCode);
   }
 
   Map<String, dynamic> _decodeJson(String body) {

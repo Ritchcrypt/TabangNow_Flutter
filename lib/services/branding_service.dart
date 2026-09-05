@@ -109,10 +109,6 @@ class BrandingService {
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeAuthorizedResponse(response);
 
-    // One Admin branding update must immediately fan out to every mobile widget
-    // that represents the system logo. The public logo fetch is cache-busted by
-    // GlobalBrandingLogoController, so replacing/removing the logo is reflected
-    // without restarting the app.
     await GlobalBrandingLogoController.instance.refresh();
 
     return data;

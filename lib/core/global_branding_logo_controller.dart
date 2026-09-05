@@ -19,11 +19,15 @@ class GlobalBrandingLogoController extends ChangeNotifier {
 
   Timer? _timer;
   Uint8List? _logoBytes;
+  String _systemName = 'TabangNow';
+  String _systemSubtitle = 'Dao, Capiz';
   bool _started = false;
   bool _loaded = false;
   bool _loading = false;
 
   Uint8List? get logoBytes => _logoBytes;
+  String get systemName => _systemName;
+  String get systemSubtitle => _systemSubtitle;
   bool get hasCustomLogo => _logoBytes != null && _logoBytes!.isNotEmpty;
   bool get loaded => _loaded;
 
@@ -38,13 +42,8 @@ class GlobalBrandingLogoController extends ChangeNotifier {
 
     _started = true;
 
-    // Restore the last successfully downloaded logo before touching the
-    // network. This keeps the configured TabangNow branding visible after an
-    // app restart even when the device is offline.
     await _restoreCachedLogo();
 
-    // Refresh in the foreground once at startup. A network failure leaves the
-    // cached logo untouched, and the periodic refresh will retry later.
     await refresh();
   }
 
@@ -54,6 +53,22 @@ class GlobalBrandingLogoController extends ChangeNotifier {
     }
 
     _loading = true;
+    var changed = false;
+
+    try {
+      final branding = await _service.fetchBranding();
+
+      if (_systemName != branding.systemName) {
+        _systemName = branding.systemName;
+        changed = true;
+      }
+
+      if (_systemSubtitle != branding.systemSubtitle) {
+        _systemSubtitle = branding.systemSubtitle;
+        changed = true;
+      }
+    } catch (_) {
+    }
 
     try {
       final fetchedLogo = await _service.fetchLogoBytes();
@@ -64,9 +79,6 @@ class GlobalBrandingLogoController extends ChangeNotifier {
       _loaded = true;
 
       if (nextLogo == null) {
-        // A successful 404/no-logo response means branding was intentionally
-        // removed on the server, so the persistent custom-logo cache must also
-        // be removed. Network exceptions never enter this branch.
         await _deleteCachedLogo();
       } else {
         await _writeCachedLogo(nextLogo);
@@ -74,14 +86,16 @@ class GlobalBrandingLogoController extends ChangeNotifier {
 
       if (!_sameBytes(_logoBytes, nextLogo)) {
         _logoBytes = nextLogo;
-        notifyListeners();
+        changed = true;
       }
     } catch (_) {
-      // Keep the last known in-memory/disk logo if the public branding asset
-      // is temporarily unavailable. Offline mode must never erase branding.
       _loaded = true;
     } finally {
       _loading = false;
+    }
+
+    if (changed) {
+      notifyListeners();
     }
   }
 
@@ -130,8 +144,6 @@ class GlobalBrandingLogoController extends ChangeNotifier {
       _logoBytes = cachedLogo;
       notifyListeners();
     } catch (_) {
-      // Cache access is best-effort. The APK-bundled logo remains the final
-      // fallback even if device storage is temporarily unavailable.
     }
   }
 
@@ -141,7 +153,6 @@ class GlobalBrandingLogoController extends ChangeNotifier {
       await file.parent.create(recursive: true);
       await file.writeAsBytes(bytes, flush: true);
     } catch (_) {
-      // A cache write failure must not hide a logo that is already in memory.
     }
   }
 
@@ -153,7 +164,6 @@ class GlobalBrandingLogoController extends ChangeNotifier {
         await file.delete();
       }
     } catch (_) {
-      // Cache cleanup is best-effort.
     }
   }
 

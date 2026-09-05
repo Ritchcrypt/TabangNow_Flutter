@@ -120,7 +120,6 @@ class _UserManagementDetailScreenState
         };
       });
     } catch (_) {
-      // Keep the already-loaded User detail during temporary poll failures.
     } finally {
       _presenceRefreshing = false;
     }

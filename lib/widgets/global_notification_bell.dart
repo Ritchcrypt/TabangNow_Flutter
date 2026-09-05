@@ -149,8 +149,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
         await _surfaceInitialUnread();
       }
     } catch (_) {
-      // A temporary pulse failure must not break the bell. The next successful
-      // poll establishes the cursors without replaying old notifications.
     }
   }
 
@@ -236,7 +234,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
         }
       }
     } catch (_) {
-      // Keep polling resilient to temporary network failure.
     } finally {
       _requestRunning = false;
     }
@@ -249,7 +246,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
       );
       return;
     } catch (_) {
-      // Fall back to Flutter feedback if native Android playback is unavailable.
     }
 
     await SystemSound.play(SystemSoundType.alert);
@@ -257,10 +253,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
   }
 
   Future<void> _playUrgentEmergencyFeedback() async {
-    // Keep one notification-sound implementation across every foreground
-    // notification type. The Android native side owns the TabangNow custom
-    // sound and vibration pattern; this avoids falling back to the phone's
-    // unrelated system notification tone for emergency events.
     await _playStandardNotificationFeedback();
   }
 

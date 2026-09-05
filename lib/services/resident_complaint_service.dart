@@ -216,7 +216,6 @@ class ResidentComplaintService {
         return Map<String, dynamic>.from(decoded);
       }
     } catch (_) {
-      // Binary/private-file error responses can be empty/non-JSON.
     }
 
     return <String, dynamic>{};

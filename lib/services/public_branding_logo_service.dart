@@ -1,6 +1,17 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+
+class PublicBrandingData {
+  const PublicBrandingData({
+    required this.systemName,
+    required this.systemSubtitle,
+  });
+
+  final String systemName;
+  final String systemSubtitle;
+}
 
 class PublicBrandingLogoService {
   PublicBrandingLogoService({http.Client? client})
@@ -14,6 +25,42 @@ class PublicBrandingLogoService {
   static const Duration _requestTimeout = Duration(seconds: 10);
 
   final http.Client _client;
+
+  Future<PublicBrandingData> fetchBranding() async {
+    final response = await _client
+        .get(
+          Uri.parse('$_baseUrl/api/v1/public/system-branding'),
+          headers: const <String, String>{
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+        )
+        .timeout(_requestTimeout);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw PublicBrandingLogoException(
+        'Unable to load the TabangNow system branding.',
+        statusCode: response.statusCode,
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    final payload = decoded is Map
+        ? Map<String, dynamic>.from(decoded)
+        : <String, dynamic>{};
+    final rawData = payload['data'];
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+
+    final systemName = data['system_name']?.toString().trim() ?? '';
+    final systemSubtitle = data['system_subtitle']?.toString().trim() ?? '';
+
+    return PublicBrandingData(
+      systemName: systemName.isEmpty ? 'TabangNow' : systemName,
+      systemSubtitle: systemSubtitle.isEmpty ? 'Dao, Capiz' : systemSubtitle,
+    );
+  }
 
   Future<Uint8List?> fetchLogoBytes() async {
     final uri = Uri.parse('$_baseUrl/system-branding/logo').replace(
