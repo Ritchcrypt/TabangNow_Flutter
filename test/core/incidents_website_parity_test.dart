@@ -44,10 +44,8 @@ void main() {
     ).readAsStringSync();
 
     for (final marker in <String>[
-      'Assigned Responder',
       "incident['persons_involved']",
       "label: 'Incident Code'",
-      '_selectedResponder',
       '_remarksController',
       '_messageController',
       'Incident Messages',
@@ -55,8 +53,6 @@ void main() {
       'Danger Zone',
       '_sendMessage',
       '_deleteIncident',
-      'includeAssignedTo:',
-      'assignedTo:',
     ]) {
       expect(
         source,
@@ -66,16 +62,21 @@ void main() {
     }
   });
 
-  test('status update is status-only', () {
+  test('status update supports authorized responder assignment', () {
     final source = File(
       'lib/screens/incident_detail_screen.dart',
     ).readAsStringSync();
 
     expect(source, contains('widget.incidentService.updateStatus('));
     expect(source, contains('statusId: statusId'));
+    expect(
+      source,
+      contains("includeAssignedTo: _can('can_assign') && _assignmentChanged"),
+    );
+    expect(source, contains('assignedTo: _selectedResponderId'));
+    expect(source, contains('_selectedResponderId'));
+    expect(source, contains('_assignmentChanged'));
     expect(source, isNot(contains('remarks:')));
-    expect(source, isNot(contains('includeAssignedTo:')));
-    expect(source, isNot(contains('assignedTo:')));
   });
 
   test('admin Related Cases can create a prelinked Case', () {
