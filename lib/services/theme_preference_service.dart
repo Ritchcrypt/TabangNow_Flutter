@@ -74,11 +74,14 @@ class ThemePreferenceService {
       return data;
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      await authService.clearToken();
-    }
+    final message = _message(data);
 
-    throw AuthException(_message(data), statusCode: response.statusCode);
+    await authService.handleAuthorizationFailure(
+      statusCode: response.statusCode,
+      message: message,
+    );
+
+    throw AuthException(message, statusCode: response.statusCode);
   }
 
   Map<String, dynamic> _decodeJson(String body) {

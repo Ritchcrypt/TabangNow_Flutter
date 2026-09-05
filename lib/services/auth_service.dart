@@ -179,9 +179,10 @@ class AuthService {
       return data;
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      await clearToken();
-    }
+    await handleAuthorizationFailure(
+      statusCode: response.statusCode,
+      message: _extractErrorMessage(data),
+    );
 
     throw AuthException(
       _extractErrorMessage(data),
@@ -248,9 +249,10 @@ class AuthService {
       return data;
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      await clearToken();
-    }
+    await handleAuthorizationFailure(
+      statusCode: response.statusCode,
+      message: _extractErrorMessage(data),
+    );
 
     throw AuthException(
       _extractErrorMessage(data),
@@ -308,6 +310,19 @@ class AuthService {
     final token = await getToken();
 
     return token != null && token.isNotEmpty;
+  }
+
+  Future<void> handleAuthorizationFailure({
+    required int statusCode,
+    String? message,
+  }) async {
+    final normalizedMessage = message?.trim().toLowerCase() ?? '';
+    final inactiveAccount =
+        statusCode == 403 && normalizedMessage.contains('account is inactive');
+
+    if (statusCode == 401 || inactiveAccount) {
+      await clearToken();
+    }
   }
 
   Future<void> clearToken() async {

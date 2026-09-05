@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
-import '../widgets/sos_flip_coin_button.dart';
+import '../widgets/public_auth_branding_header.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
@@ -125,8 +125,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -136,14 +138,14 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const _TabangNowHeader(),
+                  const PublicAuthBrandingHeader(logoSize: 104),
                   const SizedBox(height: 32),
                   Card(
                     elevation: 0,
-                    color: Colors.white,
+                    color: theme.colorScheme.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: BorderSide(color: theme.dividerColor),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -152,21 +154,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            const Text(
+                            Text(
                               'Log in to your account',
-                              style: TextStyle(
-                                fontSize: 24,
+                              style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F172A),
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'Use the same account you use on the '
-                              'TabangNow website.',
-                              style: TextStyle(
+                            Text(
+                              'Use the same account you use on the website.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
                                 height: 1.4,
-                                color: Color(0xFF64748B),
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                             const SizedBox(height: 28),
@@ -178,10 +177,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               autofillHints: const <String>[
                                 AutofillHints.email,
                               ],
-                              style: const TextStyle(color: Color(0xFF0F172A)),
-                              decoration: const InputDecoration(
+                              style: TextStyle(color: theme.colorScheme.onSurface),
+                              decoration: InputDecoration(
                                 filled: true,
-                                fillColor: Colors.white,
+                                fillColor: theme.colorScheme.surface,
                                 labelText: 'Email address',
                                 hintText: 'email@example.com',
                                 prefixIcon: Icon(Icons.email_outlined),
@@ -217,10 +216,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _login();
                                 }
                               },
-                              style: const TextStyle(color: Color(0xFF0F172A)),
+                              style: TextStyle(color: theme.colorScheme.onSurface),
                               decoration: InputDecoration(
                                 filled: true,
-                                fillColor: Colors.white,
+                                fillColor: theme.colorScheme.surface,
                                 labelText: 'Password',
                                 prefixIcon: const Icon(Icons.lock_outline),
                                 border: const OutlineInputBorder(),
@@ -270,14 +269,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     'Remember me',
                                     maxLines: 1,
                                     softWrap: false,
                                     overflow: TextOverflow.visible,
                                     style: TextStyle(
-                                      color: Color(0xFF475569),
+                                      color: theme.colorScheme.onSurfaceVariant,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -365,40 +364,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _TabangNowHeader extends StatelessWidget {
-  const _TabangNowHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: <Widget>[
-        SosFlipCoinButton(size: 104),
-        SizedBox(height: 18),
-        Text(
-          'TabangNow',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'DAO, CAPIZ',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.8,
-            color: Color(0xFF64748B),
-          ),
-        ),
-      ],
     );
   }
 }

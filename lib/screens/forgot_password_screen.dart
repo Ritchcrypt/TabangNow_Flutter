@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../widgets/public_auth_branding_header.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({required this.authService, super.key});
@@ -79,10 +80,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F7FB),
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: theme.colorScheme.surface,
         elevation: 0,
         title: const Text('Forgot password'),
       ),
@@ -96,31 +100,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(26, 30, 26, 28),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: const Color(0xFFD8E0EA)),
+                  border: Border.all(color: theme.dividerColor),
                 ),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      const Text(
+                      const PublicAuthBrandingHeader(logoSize: 72),
+                      const SizedBox(height: 24),
+                      Text(
                         'Reset your password',
                         style: TextStyle(
-                          color: Color(0xFF0F172A),
+                          color: theme.colorScheme.onSurface,
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Enter the email address registered '
-                        'with TabangNow. If the account exists, '
-                        'a password reset link will be sent to '
-                        'that email.',
+                      Text(
+                        'Enter the email address registered with the system. '
+                        'If the account exists, a password reset link will be '
+                        'sent to that email.',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 16,
                           height: 1.45,
                         ),
@@ -134,31 +139,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         textInputAction: TextInputAction.done,
                         autofillHints: const <String>[AutofillHints.email],
                         onFieldSubmitted: (_) => _sendResetLink(),
-                        keyboardAppearance: Brightness.light,
-                        style: const TextStyle(
-                          color: Color(0xFF0F172A),
+                        keyboardAppearance: theme.brightness,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
-                        cursorColor: Color(0xFF2563EB),
-                        decoration: const InputDecoration(
+                        cursorColor: theme.colorScheme.primary,
+                        decoration: InputDecoration(
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: theme.colorScheme.surface,
                           labelText: 'Email address',
                           hintText: 'email@example.com',
-                          labelStyle: TextStyle(color: Color(0xFF475569)),
-                          hintStyle: TextStyle(color: Color(0xFF94A3B8)),
+                          labelStyle: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          hintStyle: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                           prefixIcon: Icon(
                             Icons.email_outlined,
-                            color: Color(0xFF64748B),
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                           enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Color(0xFFCBD5E1)),
+                            borderSide: BorderSide(color: theme.dividerColor),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(
-                              color: Color(0xFF2563EB),
+                              color: theme.colorScheme.primary,
                               width: 2,
                             ),
                           ),

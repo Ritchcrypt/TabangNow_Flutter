@@ -19,11 +19,15 @@ class GlobalBrandingLogoController extends ChangeNotifier {
 
   Timer? _timer;
   Uint8List? _logoBytes;
+  String _systemName = 'TabangNow';
+  String _systemSubtitle = 'Dao, Capiz';
   bool _started = false;
   bool _loaded = false;
   bool _loading = false;
 
   Uint8List? get logoBytes => _logoBytes;
+  String get systemName => _systemName;
+  String get systemSubtitle => _systemSubtitle;
   bool get hasCustomLogo => _logoBytes != null && _logoBytes!.isNotEmpty;
   bool get loaded => _loaded;
 
@@ -54,6 +58,23 @@ class GlobalBrandingLogoController extends ChangeNotifier {
     }
 
     _loading = true;
+    var changed = false;
+
+    try {
+      final branding = await _service.fetchBranding();
+
+      if (_systemName != branding.systemName) {
+        _systemName = branding.systemName;
+        changed = true;
+      }
+
+      if (_systemSubtitle != branding.systemSubtitle) {
+        _systemSubtitle = branding.systemSubtitle;
+        changed = true;
+      }
+    } catch (_) {
+      // Text branding is best-effort. Keep the last known/default identity.
+    }
 
     try {
       final fetchedLogo = await _service.fetchLogoBytes();
@@ -74,7 +95,7 @@ class GlobalBrandingLogoController extends ChangeNotifier {
 
       if (!_sameBytes(_logoBytes, nextLogo)) {
         _logoBytes = nextLogo;
-        notifyListeners();
+        changed = true;
       }
     } catch (_) {
       // Keep the last known in-memory/disk logo if the public branding asset
@@ -82,6 +103,10 @@ class GlobalBrandingLogoController extends ChangeNotifier {
       _loaded = true;
     } finally {
       _loading = false;
+    }
+
+    if (changed) {
+      notifyListeners();
     }
   }
 

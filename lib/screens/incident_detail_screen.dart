@@ -43,6 +43,8 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
   Map<String, dynamic> _options = <String, dynamic>{};
 
   int? _selectedStatusId;
+  int? _selectedResponderId;
+  bool _assignmentChanged = false;
   String? _selectedAgency;
 
   String get _role =>
@@ -75,9 +77,11 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         _mapList(options['agencies']),
         key: 'value',
       );
+      final responders = _uniqueByIntId(_mapList(options['responders']));
 
       options['statuses'] = statuses;
       options['agencies'] = agencies;
+      options['responders'] = responders;
 
       final currentStatusId = _toInt(incident['status_id']);
 
@@ -90,6 +94,18 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
           currentStatusId != null && validStatusIds.contains(currentStatusId)
           ? currentStatusId
           : (statuses.isNotEmpty ? _toInt(statuses.first['id']) : null);
+
+      final assignedTanod = _map(incident['assigned_tanod']);
+      final currentResponderId = _toInt(assignedTanod['id']);
+      final validResponderIds = responders
+          .map((responder) => _toInt(responder['id']))
+          .whereType<int>()
+          .toSet();
+      final safeResponderId =
+          currentResponderId != null &&
+              validResponderIds.contains(currentResponderId)
+          ? currentResponderId
+          : null;
 
       final validAgencyValues = agencies
           .map((agency) => agency['value']?.toString().trim())
@@ -111,6 +127,8 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         _options = options;
 
         _selectedStatusId = safeStatusId;
+        _selectedResponderId = safeResponderId;
+        _assignmentChanged = false;
 
         _selectedAgency =
             firstAgency != null && validAgencyValues.contains(firstAgency)
@@ -153,6 +171,8 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
       action: () => widget.incidentService.updateStatus(
         incidentId: widget.incidentId,
         statusId: statusId,
+        includeAssignedTo: _can('can_assign') && _assignmentChanged,
+        assignedTo: _selectedResponderId,
       ),
       successMessage: 'Incident updated successfully.',
     );
@@ -669,6 +689,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
 
   Widget _buildUpdateIncidentSection() {
     final statuses = _uniqueByIntId(_mapList(_options['statuses']));
+    final responders = _uniqueByIntId(_mapList(_options['responders']));
 
     final statusIds = statuses
         .map((status) => _toInt(status['id']))
@@ -680,9 +701,22 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         ? _selectedStatusId
         : (statuses.isNotEmpty ? _toInt(statuses.first['id']) : null);
 
+    final responderIds = responders
+        .map((responder) => _toInt(responder['id']))
+        .whereType<int>()
+        .toSet();
+
+    final safeSelectedResponderId =
+        _selectedResponderId != null &&
+            responderIds.contains(_selectedResponderId)
+        ? _selectedResponderId
+        : null;
+
     return _DetailSection(
       title: 'Update Incident',
-      subtitle: 'Change the current status for this incident.',
+      subtitle: _can('can_assign')
+          ? 'Change the current status and assigned responder for this incident.'
+          : 'Change the current status for this incident.',
       child: Column(
         children: <Widget>[
           DropdownButtonFormField<int>(
@@ -717,6 +751,50 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     });
                   },
           ),
+          if (_can('can_assign')) ...<Widget>[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              key: ValueKey<String>(
+                'incident-responder-${widget.incidentId}-${safeSelectedResponderId ?? -1}-${responders.length}',
+              ),
+              initialValue: safeSelectedResponderId ?? -1,
+              decoration: const InputDecoration(
+                labelText: 'Assigned Responder',
+                border: OutlineInputBorder(),
+              ),
+              items: <DropdownMenuItem<int>>[
+                const DropdownMenuItem<int>(
+                  value: -1,
+                  child: Text('Unassigned'),
+                ),
+                ...responders
+                    .map((responder) {
+                      final id = _toInt(responder['id']);
+
+                      if (id == null) {
+                        return null;
+                      }
+
+                      return DropdownMenuItem<int>(
+                        value: id,
+                        child: Text(
+                          responder['name']?.toString() ?? 'Tanod #$id',
+                        ),
+                      );
+                    })
+                    .whereType<DropdownMenuItem<int>>(),
+              ],
+              onChanged: _actionBusy
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _selectedResponderId =
+                            value == null || value < 1 ? null : value;
+                        _assignmentChanged = true;
+                      });
+                    },
+            ),
+          ],
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
