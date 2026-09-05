@@ -3,16 +3,16 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('development boot has no active LoginScreen fallback', () {
-    final gate = File('lib/screens/dev_session_gate.dart').readAsStringSync();
+  test('production boot uses AuthGate and has no development session gate', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+    final authGate = File('lib/screens/auth_gate.dart').readAsStringSync();
 
-    final auth = File('lib/services/auth_service.dart').readAsStringSync();
-
-    expect(gate, contains('_authService.devSession()'));
-    expect(gate, contains('_restoreOrCreateDevelopmentSession'));
-    expect(gate, isNot(contains('LoginScreen')));
-    expect(gate, isNot(contains('Open Login')));
-    expect(auth, contains('/api/v1/auth/dev-session'));
+    expect(File('lib/screens/dev_session_gate.dart').existsSync(), isFalse);
+    expect(mainSource, contains("import 'screens/auth_gate.dart';"));
+    expect(mainSource, contains('MobileUpdateGate(child: AuthGate())'));
+    expect(authGate, contains('_restoreSession()'));
+    expect(authGate, isNot(contains('devSession()')));
+    expect(authGate, isNot(contains('DevSessionGate')));
   });
 
   test('Case Management is live in global navigation', () {

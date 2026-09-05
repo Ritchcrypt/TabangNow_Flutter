@@ -3,23 +3,29 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('public auth screens keep only the spinning SOS launcher', () {
-    for (final path in <String>[
-      'lib/screens/auth_gate.dart',
-      'lib/screens/login_screen.dart',
-      'lib/screens/register_screen.dart',
-    ]) {
-      final source = File(path).readAsStringSync();
+  test('public auth screens retain the spinning SOS launcher', () {
+    final authGate = File('lib/screens/auth_gate.dart').readAsStringSync();
+    final login = File('lib/screens/login_screen.dart').readAsStringSync();
+    final register = File('lib/screens/register_screen.dart').readAsStringSync();
+    final sharedHeader = File(
+      'lib/widgets/public_auth_branding_header.dart',
+    ).readAsStringSync();
 
-      expect(
-        source,
-        contains('SosFlipCoinButton'),
-        reason: '$path must retain the public spinning SOS launcher.',
-      );
+    expect(authGate, contains('SosFlipCoinButton'));
+    expect(login, contains('PublicAuthBrandingHeader'));
+    expect(register, contains('PublicAuthBrandingHeader'));
+    expect(sharedHeader, contains('SosFlipCoinButton'));
+
+    for (final source in <String>[
+      authGate,
+      login,
+      register,
+      sharedHeader,
+    ]) {
       expect(
         source,
         isNot(contains('PublicEmergencyAccessCard')),
-        reason: '$path must not render the removed Emergency SOS card.',
+        reason: 'Public auth surfaces must not render the removed Emergency SOS card.',
       );
     }
   });
