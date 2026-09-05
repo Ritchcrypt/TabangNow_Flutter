@@ -331,7 +331,6 @@ class UserManagementService {
         return Map<String, dynamic>.from(decoded);
       }
     } catch (_) {
-      // CSV/binary response bodies do not need JSON parsing.
     }
 
     return <String, dynamic>{};

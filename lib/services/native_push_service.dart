@@ -148,9 +148,6 @@ class NativePushService {
 
       await messaging.setAutoInitEnabled(true);
 
-      // Request Android notification permission during app startup so
-      // Android 13+ users receive the system prompt independently of login.
-      // FCM token registration remains tied to authenticated user sync.
       try {
         await messaging.requestPermission(
           alert: true,
@@ -158,7 +155,6 @@ class NativePushService {
           sound: true,
         );
       } catch (_) {
-        // Permission prompting must never block Firebase/app startup.
       }
 
       FirebaseMessaging.onMessage.listen((message) {
@@ -183,8 +179,6 @@ class NativePushService {
 
       _ready = true;
     } catch (_) {
-      // Native push must fail open. The existing Laravel notification center
-      // and 15-second in-app polling remain the fallback notification path.
       _messaging = null;
       _ready = false;
     }
@@ -219,8 +213,6 @@ class NativePushService {
 
       await _registerToken(token, authService);
     } catch (_) {
-      // Push registration is best-effort. Authentication and the existing
-      // notification center must remain usable if Firebase is unavailable.
     }
   }
 
@@ -235,7 +227,6 @@ class NativePushService {
     try {
       await _revokeServerRegistration(authService);
     } catch (_) {
-      // Continue with local token deletion even if the server is unavailable.
     }
 
     _authenticatedAuthService = null;
@@ -243,7 +234,6 @@ class NativePushService {
     try {
       await messaging.deleteToken();
     } catch (_) {
-      // Logout must never be blocked by Firebase cleanup.
     }
   }
 
@@ -258,7 +248,6 @@ class NativePushService {
         'playNotificationFeedback',
       );
     } catch (_) {
-      // Sound/vibration feedback must never block notification delivery.
     }
   }
   Future<void> _registerToken(String fcmToken, AuthService authService) async {

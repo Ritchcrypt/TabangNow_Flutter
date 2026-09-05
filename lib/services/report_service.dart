@@ -144,7 +144,6 @@ class ReportService {
         return Map<String, dynamic>.from(decoded);
       }
     } catch (_) {
-      // PDF/error body is allowed to be non-JSON.
     }
 
     return <String, dynamic>{};

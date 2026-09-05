@@ -75,7 +75,6 @@ class TabangNowThemeController {
 
     final isDark = brightness == Brightness.dark;
 
-    // Exact neutral palette used by the website theme layer.
     final pageBackground = isDark
         ? const Color(0xFF020617)
         : const Color(0xFFF1F5F9);
@@ -307,8 +306,6 @@ class TabangNowThemeController {
         ),
       ),
 
-      // Keep these named values referenced so the implementation documents
-      // exact website parity instead of relying on generated Material colors.
       cardColor: surface,
       hoverColor: surfaceMuted,
       focusColor: surfaceSoft,

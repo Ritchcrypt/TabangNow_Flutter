@@ -94,7 +94,6 @@ class _GlobalAccountFooterState extends State<GlobalAccountFooter> {
         _photoBytes = bytes;
       });
     } catch (_) {
-      // No profile photo is a normal state.
     }
   }
 

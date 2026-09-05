@@ -300,7 +300,6 @@ class _AuthGateState extends State<AuthGate> {
                             },
                           ),
                           const SizedBox(height: 20),
-                          // tabangnow_password_help_position_v2
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
@@ -353,7 +352,6 @@ class _AuthGateState extends State<AuthGate> {
                           const SizedBox(height: 14),
                           Row(
                             children: <Widget>[
-                              // tabangnow_login_layout_patch_v1
                               const SizedBox(height: 8),
                               Padding(
                                 padding: const EdgeInsets.only(left: 2),

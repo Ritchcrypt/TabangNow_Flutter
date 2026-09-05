@@ -123,7 +123,6 @@ class ActivityLogService {
         return Map<String, dynamic>.from(decoded);
       }
     } catch (_) {
-      // Invalid/non-JSON errors use the fallback message below.
     }
 
     return <String, dynamic>{};

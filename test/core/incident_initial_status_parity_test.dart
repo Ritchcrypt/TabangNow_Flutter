@@ -24,8 +24,6 @@ void main() {
       ),
     );
 
-    // Laravel owns the initial status. Mobile must not submit its own initial
-    // status when creating an incident.
     expect(incidentService, isNot(contains("..fields['status']")));
 
     expect(incidentService, isNot(contains("..fields['status_id']")));

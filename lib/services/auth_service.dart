@@ -209,11 +209,8 @@ class AuthService {
           )
           .timeout(_requestTimeout);
     } on TimeoutException {
-      // Presence is best-effort and must never interrupt the app.
     } on SocketException {
-      // A temporary network loss naturally ages the user offline.
     } on http.ClientException {
-      // Presence is informational; normal authenticated requests own errors.
     }
   }
   Future<Map<String, dynamic>> dashboard() {

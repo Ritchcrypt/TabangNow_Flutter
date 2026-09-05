@@ -198,8 +198,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         }
       });
     } catch (_) {
-      // Presence polling is best-effort and must not replace the loaded list
-      // with an error screen if the network briefly drops.
     } finally {
       _presenceRefreshing = false;
     }

@@ -120,7 +120,6 @@ class MobileSosService {
           source: 'current',
         );
       } catch (_) {
-        // Fall through to the device's cached last-known position.
       }
     }
 
@@ -136,7 +135,6 @@ class MobileSosService {
         );
       }
     } catch (_) {
-      // The actionable error below is clearer than a platform exception.
     }
 
     if (!serviceEnabled) {
@@ -280,7 +278,6 @@ class MobileSosService {
         }
       }
     } catch (_) {
-      // SOS sending must still work if optional account linking fails.
     }
 
     return stored.isEmpty ? null : stored;

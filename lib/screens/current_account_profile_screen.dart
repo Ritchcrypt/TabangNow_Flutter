@@ -1,4 +1,3 @@
-// TABANGNOW_FULL_PROFILE_PARITY_V2
 import 'dart:io';
 import 'dart:typed_data';
 
