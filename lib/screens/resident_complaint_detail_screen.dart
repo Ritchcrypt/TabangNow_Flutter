@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/tabangnow_theme.dart';
 import '../services/resident_complaint_service.dart';
+import 'photo_capture_screen.dart';
 
 class ResidentComplaintDetailScreen extends StatefulWidget {
   const ResidentComplaintDetailScreen({
@@ -144,10 +145,33 @@ class _ResidentComplaintDetailScreenState
       return;
     }
 
-    final file = result.files.single;
+    _setProofPicture(result.files.single);
+  }
 
-    if (file.path == null) {
+  Future<void> _takeProofPhoto() async {
+    final photo = await capturePhotoInApp(
+      context,
+      title: 'Take Action Proof Photo',
+    );
+
+    if (photo == null || !mounted) {
+      return;
+    }
+
+    _setProofPicture(photo);
+  }
+
+  void _setProofPicture(PlatformFile file) {
+    if (file.path == null || file.path!.trim().isEmpty) {
       _show('The selected proof image could not be accessed.');
+      return;
+    }
+
+    const allowedExtensions = <String>['jpg', 'jpeg', 'png', 'webp'];
+    final extension = file.extension?.trim().toLowerCase() ?? '';
+
+    if (!allowedExtensions.contains(extension)) {
+      _show('Proof must be JPG, JPEG, PNG, or WEBP.');
       return;
     }
 
@@ -488,13 +512,29 @@ class _ResidentComplaintDetailScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _pickProof,
-                        icon: const Icon(Icons.image_outlined),
-                        label: Text(
-                          _proofPicture == null
-                              ? 'Choose Action Proof Picture'
-                              : 'Change Action Proof Picture',
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _busy ? null : _takeProofPhoto,
+                          icon: const Icon(Icons.camera_alt_outlined),
+                          label: Text(
+                            _proofPicture == null
+                                ? 'Take Action Proof Photo'
+                                : 'Retake Action Proof Photo',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _busy ? null : _pickProof,
+                          icon: const Icon(Icons.image_outlined),
+                          label: Text(
+                            _proofPicture == null
+                                ? 'Choose Existing Proof Picture'
+                                : 'Choose Different Proof Picture',
+                          ),
                         ),
                       ),
                       if (_proofPicture != null) ...<Widget>[

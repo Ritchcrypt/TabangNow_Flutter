@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../core/tabangnow_theme.dart';
 import '../services/resident_complaint_service.dart';
+import 'photo_capture_screen.dart';
 
 class ResidentComplaintCreateScreen extends StatefulWidget {
   const ResidentComplaintCreateScreen({
@@ -63,10 +64,33 @@ class _ResidentComplaintCreateScreenState
       return;
     }
 
-    final file = result.files.single;
+    _setEvidence(result.files.single);
+  }
 
-    if (file.path == null) {
+  Future<void> _takeEvidencePhoto() async {
+    final photo = await capturePhotoInApp(
+      context,
+      title: 'Take Complaint Evidence Photo',
+    );
+
+    if (photo == null || !mounted) {
+      return;
+    }
+
+    _setEvidence(photo);
+  }
+
+  void _setEvidence(PlatformFile file) {
+    if (file.path == null || file.path!.trim().isEmpty) {
       _show('The selected image could not be accessed.');
+      return;
+    }
+
+    const allowedExtensions = <String>['jpg', 'jpeg', 'png', 'webp'];
+    final extension = file.extension?.trim().toLowerCase() ?? '';
+
+    if (!allowedExtensions.contains(extension)) {
+      _show('Evidence must be JPG, JPEG, PNG, or WEBP.');
       return;
     }
 
@@ -241,13 +265,29 @@ class _ResidentComplaintCreateScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        OutlinedButton.icon(
-                          onPressed: _saving ? null : _pickEvidence,
-                          icon: const Icon(Icons.image_outlined),
-                          label: Text(
-                            _evidence == null
-                                ? 'Choose Evidence Picture'
-                                : 'Change Evidence Picture',
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _saving ? null : _takeEvidencePhoto,
+                            icon: const Icon(Icons.camera_alt_outlined),
+                            label: Text(
+                              _evidence == null
+                                  ? 'Take Evidence Photo'
+                                  : 'Retake Evidence Photo',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _saving ? null : _pickEvidence,
+                            icon: const Icon(Icons.image_outlined),
+                            label: Text(
+                              _evidence == null
+                                  ? 'Choose Existing Picture'
+                                  : 'Choose Different Picture',
+                            ),
                           ),
                         ),
                         if (_evidence != null) ...<Widget>[
