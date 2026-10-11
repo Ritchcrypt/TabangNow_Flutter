@@ -279,27 +279,48 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
 
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-      ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: <Widget>[
-            Expanded(child: _cameraBody(captured)),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.redAccent),
+            Positioned.fill(
+              child: Column(
+                children: <Widget>[
+                  Expanded(child: ClipRect(child: _cameraBody(captured))),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      child: Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: captured == null
+                        ? _captureControls()
+                        : _previewControls(),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: SafeArea(
+                child: Material(
+                  color: Colors.black54,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: 'Back',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: captured == null ? _captureControls() : _previewControls(),
             ),
           ],
         ),
@@ -309,10 +330,11 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
 
   Widget _cameraBody(XFile? captured) {
     if (captured != null) {
-      return Center(
+      return SizedBox.expand(
         child: Image.file(
           File(captured.path),
-          fit: BoxFit.contain,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
           errorBuilder: (_, _, _) => const Center(
             child: Text(
               'Unable to preview the captured photo.',
@@ -344,11 +366,40 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
       );
     }
 
-    return Center(
-      child: AspectRatio(
-        aspectRatio: controller.value.aspectRatio,
-        child: CameraPreview(controller),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final previewSize = controller.value.previewSize;
+
+        if (previewSize == null ||
+            previewSize.width <= 0 ||
+            previewSize.height <= 0) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final viewportAspectRatio =
+            constraints.maxWidth / constraints.maxHeight;
+
+        final cameraAspectRatio = previewSize.height / previewSize.width;
+
+        var scale = cameraAspectRatio / viewportAspectRatio;
+
+        if (scale < 1) {
+          scale = 1 / scale;
+        }
+
+        return ClipRect(
+          child: Transform.scale(
+            scale: scale,
+            alignment: Alignment.center,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: cameraAspectRatio,
+                child: CameraPreview(controller),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
