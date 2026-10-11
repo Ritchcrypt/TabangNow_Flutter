@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/global_theme_controller.dart';
 import '../services/auth_service.dart';
 import '../services/theme_preference_service.dart';
+import 'theme_color_picker.dart';
 
 class GlobalThemeButton extends StatefulWidget {
   const GlobalThemeButton({
@@ -24,9 +25,6 @@ class _GlobalThemeButtonState extends State<GlobalThemeButton> {
   bool _loading = true;
   String _mode = 'system';
   String _customColor = '#2563EB';
-
-  bool get _isAdmin =>
-      (widget.user['role']?.toString() ?? '').trim().toLowerCase() == 'admin';
 
   @override
   void initState() {
@@ -171,7 +169,6 @@ class _GlobalThemeButtonState extends State<GlobalThemeButton> {
         return _ThemePreferenceSheet(
           currentMode: _mode,
           currentColor: _customColor,
-          isAdmin: _isAdmin,
           busy: _loading,
           onSelect: (mode) async {
             Navigator.of(sheetContext).pop();
@@ -198,13 +195,6 @@ class _GlobalThemeButtonState extends State<GlobalThemeButton> {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: theme.dividerColor),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x0A0F172A),
-              blurRadius: 4,
-              offset: Offset(0, 1),
-            ),
-          ],
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -231,7 +221,6 @@ class _ThemePreferenceSheet extends StatefulWidget {
   const _ThemePreferenceSheet({
     required this.currentMode,
     required this.currentColor,
-    required this.isAdmin,
     required this.busy,
     required this.onSelect,
     required this.onCustom,
@@ -239,7 +228,6 @@ class _ThemePreferenceSheet extends StatefulWidget {
 
   final String currentMode;
   final String currentColor;
-  final bool isAdmin;
   final bool busy;
   final Future<void> Function(String mode) onSelect;
   final Future<void> Function(String color) onCustom;
@@ -310,12 +298,11 @@ class _ThemePreferenceSheetState extends State<_ThemePreferenceSheet> {
               title: 'System',
               description: 'Follow your device appearance.',
             ),
-            if (widget.isAdmin) ...<Widget>[
-              const SizedBox(height: 14),
+            const SizedBox(height: 14),
               const Divider(),
               const SizedBox(height: 10),
               const Text(
-                'ADMIN CUSTOM COLOR',
+                'CUSTOM COLOR',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
@@ -323,32 +310,22 @@ class _ThemePreferenceSheetState extends State<_ThemePreferenceSheet> {
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: _colorController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  hintText: '#2563EB',
-                  helperText: 'HEX format, for example #2563EB',
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: widget.busy ? null : _applyCustom,
-                  icon: const Text('🎨'),
-                  label: const Text('Apply Custom'),
-                ),
+              ThemeColorPicker(
+                initialColor: widget.currentColor,
+                busy: widget.busy,
+                onApply: (color) {
+                  _colorController.text = color;
+                  return _applyCustom();
+                },
               ),
               const SizedBox(height: 6),
               Text(
-                'Applies only to your admin account view.',
+                'Applies only to your account on web and mobile.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
-            ],
           ],
         ),
       ),

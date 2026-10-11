@@ -5,12 +5,13 @@ import 'dart:math';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../firebase_options.dart';
 import 'auth_service.dart';
+import 'background_notification_alert_service.dart';
 
 int? notificationIdFromPushData(Map<String, dynamic> data) {
   final raw = data['notification_id'];
@@ -40,9 +41,16 @@ class NativePushEvent {
     RemoteMessage message, {
     required bool openRequested,
   }) {
+    return NativePushEvent.fromData(message.data, openRequested: openRequested);
+  }
+
+  factory NativePushEvent.fromData(
+    Map<String, dynamic> data, {
+    required bool openRequested,
+  }) {
     return NativePushEvent(
-      notificationId: notificationIdFromPushData(message.data),
-      type: (message.data['type']?.toString() ?? '').trim().toLowerCase(),
+      notificationId: notificationIdFromPushData(data),
+      type: (data['type']?.toString() ?? '').trim().toLowerCase(),
       openRequested: openRequested,
     );
   }
@@ -63,7 +71,11 @@ class NativePushBridge {
   }
 
   static void opened(RemoteMessage message) {
-    final event = NativePushEvent.fromMessage(message, openRequested: true);
+    openedData(message.data);
+  }
+
+  static void openedData(Map<String, dynamic> data) {
+    final event = NativePushEvent.fromData(data, openRequested: true);
 
     if (event.notificationId != null) {
       _pendingOpenNotificationId = event.notificationId;
@@ -95,16 +107,15 @@ Future<void> tabangNowFirebaseMessagingBackgroundHandler(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
+
+  await TabangNowNotificationAlert.showFromData(message.data);
 }
 
-class NativePushService {
+class NativePushService with WidgetsBindingObserver {
   NativePushService._();
 
   static final NativePushService instance = NativePushService._();
 
-  static const MethodChannel _notificationFeedbackChannel = MethodChannel(
-    'tabangnow/notification_feedback',
-  );
   static const String _installationIdKey =
       'tabangnow_emergency_installation_id';
   static const Duration _requestTimeout = Duration(seconds: 15);
@@ -132,6 +143,21 @@ class NativePushService {
       return;
     }
 
+    WidgetsBinding.instance.addObserver(this);
+
+    try {
+      final launchData = await TabangNowNotificationAlert.initializeMain(
+        onOpened: NativePushBridge.openedData,
+      );
+      await TabangNowNotificationAlert.stopPersistentAlert();
+
+      if (launchData != null) {
+        NativePushBridge.openedData(launchData);
+      }
+    } catch (_) {
+      // Preserve the existing Firebase/token path even if local-alert setup fails.
+    }
+
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
@@ -154,12 +180,10 @@ class NativePushService {
           badge: true,
           sound: true,
         );
-      } catch (_) {
-      }
+      } catch (_) {}
 
       FirebaseMessaging.onMessage.listen((message) {
         NativePushBridge.received(message);
-        unawaited(_playForegroundNotificationFeedback());
       });
 
       FirebaseMessaging.onMessageOpenedApp.listen(NativePushBridge.opened);
@@ -212,11 +236,12 @@ class NativePushService {
       }
 
       await _registerToken(token, authService);
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<void> unregisterForAuthenticatedUser(AuthService authService) async {
+    await TabangNowNotificationAlert.stopPersistentAlert();
+
     final messaging = _messaging;
 
     if (!_ready || messaging == null) {
@@ -226,30 +251,42 @@ class NativePushService {
 
     try {
       await _revokeServerRegistration(authService);
-    } catch (_) {
-    }
+    } catch (_) {}
 
     _authenticatedAuthService = null;
 
     try {
       await messaging.deleteToken();
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
+  Future<TabangNowNotificationSettings> notificationSettings() async {
+    return TabangNowNotificationAlert.readSettings();
+  }
 
-  Future<void> _playForegroundNotificationFeedback() async {
+  Future<bool> requestNotificationPermission() async {
     if (!Platform.isAndroid) {
-      return;
+      return false;
     }
 
-    try {
-      await _notificationFeedbackChannel.invokeMethod<void>(
-        'playNotificationFeedback',
-      );
-    } catch (_) {
+    return TabangNowNotificationAlert.requestNotificationPermission();
+  }
+
+  Future<bool> openNotificationSettings() async {
+    if (!Platform.isAndroid) {
+      return false;
+    }
+
+    return TabangNowNotificationAlert.openNotificationSettings();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(TabangNowNotificationAlert.stopPersistentAlert());
     }
   }
+
   Future<void> _registerToken(String fcmToken, AuthService authService) async {
     final authToken = (await authService.getToken())?.trim() ?? '';
 

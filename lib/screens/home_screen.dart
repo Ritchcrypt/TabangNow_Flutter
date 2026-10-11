@@ -21,6 +21,7 @@ import '../services/auth_service.dart';
 import '../services/branding_service.dart';
 import '../services/incident_service.dart';
 import '../services/resident_complaint_service.dart';
+import '../services/user_management_service.dart';
 import 'distress_signal_detail_screen.dart';
 import 'distress_signal_screen.dart';
 import 'incident_detail_screen.dart';
@@ -31,6 +32,7 @@ import 'emergency_hotlines_screen.dart';
 import 'barangay_map_screen.dart';
 import 'reports_screen.dart';
 import 'user_management_screen.dart';
+import 'user_management_detail_screen.dart';
 import 'activity_logs_screen.dart';
 import 'current_account_profile_screen.dart';
 import 'resident_complaint_detail_screen.dart';
@@ -88,8 +90,25 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  static const Color _navy = Color(0xFF172554);
+  Color get _navy =>
+      Theme.of(context).navigationDrawerTheme.backgroundColor ??
+      const Color(0xFF172554);
   Color get _activeBlue => Theme.of(context).colorScheme.primary;
+
+  bool get _usesDefaultAccent => _activeBlue.toARGB32() == 0xFF2563EB;
+
+  Color get _drawerSubtitleColor => _usesDefaultAccent
+      ? const Color(0xFFBFDBFE)
+      : Color.alphaBlend(Colors.white.withValues(alpha: 0.72), _navy);
+
+  Color get _drawerInactiveColor => _usesDefaultAccent
+      ? const Color(0xFFDBEAFE)
+      : Color.alphaBlend(Colors.white.withValues(alpha: 0.84), _navy);
+
+  Color get _drawerDividerColor => _usesDefaultAccent
+      ? const Color(0xFF1E3A8A)
+      : _activeBlue.withValues(alpha: 0.45);
+
   Color get _contentBackground => Theme.of(context).scaffoldBackgroundColor;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -161,8 +180,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _sendPresenceHeartbeat() async {
     try {
       await _authService.presenceHeartbeat();
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   @override
@@ -205,8 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _systemSubtitle = subtitle.isEmpty ? 'Dao, Capiz' : subtitle;
         _systemLogoBytes = logoBytes;
       });
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<void> _openSystemBranding() async {
@@ -292,8 +309,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await NativePushService.instance.unregisterForAuthenticatedUser(
         _authService,
       );
-    } catch (_) {
-    }
+    } catch (_) {}
 
     try {
       await _authService.logout();
@@ -418,8 +434,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (rawUser is Map) {
         refreshedIdentity.addAll(Map<String, dynamic>.from(rawUser));
       }
-    } catch (_) {
-    }
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
@@ -535,8 +550,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         break;
 
       case 'userManagement':
-        _showPendingModule('User Management');
-        return;
+        if (ModuleRegistry.canAccess(_appRole, AppModuleId.userManagement)) {
+          if (target.sourceId != null) {
+            final service = UserManagementService(authService: _authService);
+
+            await Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => UserManagementDetailScreen(
+                  service: service,
+                  userId: target.sourceId!,
+                ),
+              ),
+            );
+
+            return;
+          }
+
+          _selectModule(_HomeModule.userManagement);
+          return;
+        }
+
+        break;
 
       default:
         break;
@@ -578,13 +612,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: theme.dividerColor),
-              boxShadow: const <BoxShadow>[
-                BoxShadow(
-                  color: Color(0x0A0F172A),
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-              ],
             ),
             child: IconButton(
               tooltip: 'Open menu',
@@ -686,8 +713,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final content = Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1)),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.45),
+          ),
+        ),
       ),
       child: Row(
         children: <Widget>[
@@ -738,8 +771,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   _systemSubtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFBFDBFE),
+                  style: TextStyle(
+                    color: _drawerSubtitleColor,
                     fontSize: 14,
                     height: 1.2,
                     fontWeight: FontWeight.w400,
@@ -820,7 +853,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 style: TextStyle(
                                   color: isActive
                                       ? Colors.white
-                                      : const Color(0xFFDBEAFE),
+                                      : _drawerInactiveColor,
                                   fontSize: 14,
                                   fontWeight: isActive
                                       ? FontWeight.w700
@@ -836,7 +869,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 },
               ),
             ),
-            const Divider(height: 1, color: Color(0xFF1E3A8A)),
+            Divider(height: 1, color: _drawerDividerColor),
             GlobalAccountFooter(
               key: ValueKey<int>(_profileRevision),
               user: widget.user,
@@ -970,7 +1003,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     .map(
                       (metric) => SizedBox(
                         width: cardWidth,
-                        child: _SummaryCard(metric: metric),
+                        child: _SummaryCard(
+                          metric: metric,
+                          onTap: () => _openDashboardMetric(metric),
+                        ),
                       ),
                     )
                     .toList(),
@@ -992,6 +1028,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _openDashboardMetric(_DashboardMetric metric) {
+    switch (_role) {
+      case 'admin':
+        if (metric.label == 'Tanod On Duty') {
+          _selectModule(_HomeModule.tanodRoster);
+          return;
+        }
+
+        if (metric.label == 'Active Cases' &&
+            ModuleRegistry.canAccess(_appRole, AppModuleId.caseManagement)) {
+          _selectModule(_HomeModule.caseManagement);
+          return;
+        }
+
+        _selectModule(_HomeModule.incidents);
+        return;
+
+      case 'official':
+      case 'dao':
+        if (metric.label == 'Tanod On Duty') {
+          _selectModule(_HomeModule.tanodRoster);
+          return;
+        }
+
+        _selectModule(_HomeModule.incidents);
+        return;
+
+      case 'tanod':
+        if (metric.label == 'Assigned Incidents') {
+          _selectModule(_HomeModule.incidents);
+          return;
+        }
+
+        _selectModule(_HomeModule.tanodTasks);
+        return;
+
+      case 'resident':
+      default:
+        _selectModule(_HomeModule.incidents);
+        return;
+    }
+  }
+
   List<_DashboardMetric> _dashboardSummaryCards(Map<String, dynamic> summary) {
     String value(String key) => summary[key]?.toString() ?? '0';
 
@@ -1002,9 +1081,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             label: 'Total Incidents',
             value: value('total_incidents'),
             icon: Icons.description_rounded,
-            accent: const Color(0xFF2563EB),
+            accent: TabangNowTheme.of(context).accent,
             background: TabangNowTheme.of(context).surface,
-            border: const Color(0xFF93C5FD),
+            border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
             label: 'Active Cases',
@@ -1054,9 +1133,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             label: 'Total Incidents',
             value: value('total_incidents'),
             icon: Icons.description_rounded,
-            accent: const Color(0xFF2563EB),
+            accent: TabangNowTheme.of(context).accent,
             background: TabangNowTheme.of(context).surface,
-            border: const Color(0xFF93C5FD),
+            border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
             label: 'Active Cases',
@@ -1099,9 +1178,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             value: value('assigned_incidents'),
             subtitle: 'Incidents currently assigned to you',
             icon: Icons.description_rounded,
-            accent: const Color(0xFF1D4ED8),
-            background: const Color(0xFFEFF6FF),
-            border: const Color(0xFFBFDBFE),
+            accent: TabangNowTheme.of(context).accent,
+            background: TabangNowTheme.of(context).accentSoft,
+            border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
             label: 'Pending Tasks',
@@ -1140,9 +1219,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             value: value('my_reports'),
             subtitle: 'Incident reports you submitted',
             icon: Icons.description_rounded,
-            accent: const Color(0xFF1D4ED8),
-            background: const Color(0xFFEFF6FF),
-            border: const Color(0xFFBFDBFE),
+            accent: TabangNowTheme.of(context).accent,
+            background: TabangNowTheme.of(context).accentSoft,
+            border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
             label: 'Pending Reports',
@@ -1380,8 +1459,8 @@ class _DashboardHeroCard extends StatelessWidget {
         children: <Widget>[
           Text(
             eyebrow,
-            style: const TextStyle(
-              color: Color(0xFF1D4ED8),
+            style: TextStyle(
+              color: TabangNowTheme.of(context).accent,
               fontSize: 12,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.9,
@@ -1413,72 +1492,102 @@ class _DashboardHeroCard extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.metric});
+  const _SummaryCard({required this.metric, required this.onTap});
 
   final _DashboardMetric metric;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 156),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: metric.background,
-        border: Border.all(color: metric.border),
+    final palette = TabangNowTheme.of(context);
+    final tintedBackground = Color.alphaBlend(
+      metric.accent.withValues(alpha: palette.isDark ? 0.18 : 0.10),
+      metric.background,
+    );
+
+    return Semantics(
+      button: true,
+      label: 'Open ${metric.label}',
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 156),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: metric.accent.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(12),
+              color: tintedBackground,
+              border: Border.all(color: metric.border),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
             ),
-            child: Icon(metric.icon, color: metric.accent, size: 23),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: metric.accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(metric.icon, color: metric.accent, size: 23),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  metric.value,
+                  style: TextStyle(
+                    color: palette.textMain,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        metric.label,
+                        style: TextStyle(
+                          color: metric.accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 17,
+                      color: metric.accent,
+                    ),
+                  ],
+                ),
+                if ((metric.subtitle ?? '').isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    metric.subtitle!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: metric.accent.withValues(alpha: 0.85),
+                      fontSize: 10.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            metric.value,
-            style: TextStyle(
-              color: TabangNowTheme.of(context).textMain,
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            metric.label,
-            style: TextStyle(
-              color: metric.accent,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if ((metric.subtitle ?? '').isNotEmpty) ...<Widget>[
-            const SizedBox(height: 6),
-            Text(
-              metric.subtitle!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: metric.accent.withValues(alpha: 0.85),
-                fontSize: 10.5,
-                height: 1.3,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -1572,7 +1681,7 @@ class _WeatherDisasterCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: TabangNowTheme.of(context).accentSoft,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 alignment: Alignment.center,
@@ -1975,7 +2084,7 @@ class _RecentActivityPanel extends StatelessWidget {
     }
   }
 
-  static Color _statusColor(String status) {
+  static Color _statusColor(BuildContext context, String status) {
     final normalized = status.toLowerCase().replaceAll(' ', '_');
     switch (normalized) {
       case 'escalated':
@@ -1988,7 +2097,7 @@ class _RecentActivityPanel extends StatelessWidget {
       case 'closed':
         return const Color(0xFF16A34A);
       default:
-        return const Color(0xFF2563EB);
+        return TabangNowTheme.of(context).accent;
     }
   }
 
@@ -2069,7 +2178,7 @@ class _RecentActivityPanel extends StatelessWidget {
                   incident['created_at'];
 
               final priorityColor = _priorityColor(priority);
-              final statusColor = _statusColor(status);
+              final statusColor = _statusColor(context, status);
 
               return InkWell(
                 onTap: onOpenIncidents,

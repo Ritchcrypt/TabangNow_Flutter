@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "315551832661",
-    "project_id": "tabangnow-dao-capiz",
-    "storage_bucket": "tabangnow-dao-capiz.firebasestorage.app"
+    "project_number": "625615610968",
+    "project_id": "tabangnow",
+    "storage_bucket": "tabangnow.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:315551832661:android:95338dd53719134631d2dc",
+        "mobilesdk_app_id": "1:625615610968:android:41c12b63bb10b08012162d",
         "android_client_info": {
           "package_name": "ph.tabangnow.dao"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBrjaWaoVV5i3cuCijABK1IZpEU3pURSzA"
+          "current_key": "AIzaSyCxDkLmcofOzk9F2urMvTMEuFTOhWMePgk"
         }
       ],
       "services": {

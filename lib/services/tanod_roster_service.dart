@@ -40,6 +40,7 @@ class TanodRosterService {
     String? dateAppointed,
     required String shift,
     required String status,
+    bool autoDutyEnabled = false,
     String? notes,
   }) async {
     return _request(
@@ -55,6 +56,7 @@ class TanodRosterService {
             dateAppointed: dateAppointed,
             shift: shift,
             status: status,
+            autoDutyEnabled: autoDutyEnabled,
             notes: notes,
           ),
         ),
@@ -71,6 +73,7 @@ class TanodRosterService {
     String? dateAppointed,
     required String shift,
     required String status,
+    bool autoDutyEnabled = false,
     String? notes,
   }) async {
     return _request(
@@ -86,6 +89,7 @@ class TanodRosterService {
             dateAppointed: dateAppointed,
             shift: shift,
             status: status,
+            autoDutyEnabled: autoDutyEnabled,
             notes: notes,
           ),
         ),
@@ -110,6 +114,7 @@ class TanodRosterService {
     String? dateAppointed,
     required String shift,
     required String status,
+    bool autoDutyEnabled = false,
     String? notes,
   }) {
     return <String, dynamic>{
@@ -120,6 +125,7 @@ class TanodRosterService {
       'date_appointed': _nullableText(dateAppointed),
       'shift': shift.trim(),
       'status': status.trim(),
+      'auto_duty_enabled': autoDutyEnabled,
       'notes': _nullableText(notes),
     };
   }

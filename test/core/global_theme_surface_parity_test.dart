@@ -73,7 +73,10 @@ void main() {
   );
 
   test('website-equivalent global palette exists', () {
-    final source = File('lib/core/tabangnow_theme.dart').readAsStringSync();
+    final source = <String>[
+      File('lib/core/global_theme_controller.dart').readAsStringSync(),
+      File('lib/core/tabangnow_theme.dart').readAsStringSync(),
+    ].join('\n');
 
     for (final value in <String>[
       '0xFF020617',
