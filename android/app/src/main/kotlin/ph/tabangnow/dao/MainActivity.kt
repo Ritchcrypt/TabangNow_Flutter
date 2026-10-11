@@ -16,7 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val notificationChannelId = "tabangnow_notifications_v3"
+        private const val notificationChannelId = "tabangnow_notifications_v4"
         private const val notificationFeedbackChannel =
             "tabangnow/notification_feedback"
     }
@@ -36,6 +36,7 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
 
+
                 else -> result.notImplemented()
             }
         }
@@ -53,7 +54,7 @@ class MainActivity : FlutterActivity() {
         }
 
         val notificationSound = Uri.parse(
-            "android.resource://$packageName/raw/tabangnow_notification"
+            "android.resource://$packageName/raw/tabangnow_notification_v4"
         )
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -64,9 +65,9 @@ class MainActivity : FlutterActivity() {
             "TabangNow Notifications",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "TabangNow announcements and operational notifications"
+            description = "TabangNow notifications with enhanced sound and vibration"
             enableVibration(true)
-            vibrationPattern = longArrayOf(0, 320, 160, 320)
+            vibrationPattern = longArrayOf(0, 850, 250, 850, 250, 1200)
             setSound(notificationSound, audioAttributes)
             setShowBadge(true)
         }
@@ -74,9 +75,10 @@ class MainActivity : FlutterActivity() {
         notificationManager.createNotificationChannel(channel)
     }
 
+
     private fun playNotificationFeedback() {
         try {
-            val player = MediaPlayer.create(this, R.raw.tabangnow_notification)
+            val player = MediaPlayer.create(this, R.raw.tabangnow_notification_v4)
             player?.setOnCompletionListener { completed ->
                 completed.release()
             }
@@ -98,13 +100,13 @@ class MainActivity : FlutterActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(
                     VibrationEffect.createWaveform(
-                        longArrayOf(0, 320, 160, 320),
+                        longArrayOf(0, 850, 250, 850, 250, 1200),
                         -1,
                     ),
                 )
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(longArrayOf(0, 320, 160, 320), -1)
+                vibrator.vibrate(longArrayOf(0, 850, 250, 850, 250, 1200), -1)
             }
         } catch (_: Throwable) {
             // Notification feedback must never break the app.

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../core/tabangnow_theme.dart';
 import '../services/auth_service.dart';
 import '../services/global_image_crop_service.dart';
+import '../services/native_push_service.dart';
 import '../services/profile_service.dart';
 
 class CurrentAccountProfileScreen extends StatefulWidget {
@@ -455,6 +456,78 @@ class _CurrentAccountProfileScreenState
         false;
   }
 
+  Future<void> _openNotificationSettings() async {
+    final settings = await NativePushService.instance.notificationSettings();
+    if (!mounted) return;
+
+    final notificationsLabel = settings.notificationsEnabled
+        ? 'Allowed'
+        : 'Blocked';
+    final soundLabel = settings.channelFound
+        ? (settings.soundEnabled ? 'On' : 'Off')
+        : 'Uses v4 default';
+    final vibrationLabel = !settings.hasVibrator
+        ? 'Unavailable on this device'
+        : settings.channelFound
+        ? (settings.vibrationEnabled ? 'On' : 'Off')
+        : 'Uses v4 default';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Notification Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Notifications: $notificationsLabel'),
+            const SizedBox(height: 8),
+            Text('Sound: $soundLabel'),
+            const SizedBox(height: 8),
+            Text('Vibration: $vibrationLabel'),
+            const SizedBox(height: 14),
+            const Text(
+              'Android controls the final sound and vibration settings for '
+              'the TabangNow v4 notification channel.',
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          if (!settings.notificationsEnabled)
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                final granted = await NativePushService.instance
+                    .requestNotificationPermission();
+                _showMessage(
+                  granted
+                      ? 'Notification permission enabled.'
+                      : 'Notification permission is still disabled.',
+                );
+              },
+              child: const Text('Request Permission'),
+            ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              final opened = await NativePushService.instance
+                  .openNotificationSettings();
+
+              if (!opened) {
+                _showMessage('Unable to open Android notification settings.');
+              }
+            },
+            child: const Text('Android Settings'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -491,6 +564,13 @@ class _CurrentAccountProfileScreenState
             icon: const Icon(Icons.arrow_back_rounded),
           ),
           title: const Text('My Profile'),
+          actions: <Widget>[
+            IconButton(
+              tooltip: 'Notification Settings',
+              onPressed: _openNotificationSettings,
+              icon: const Icon(Icons.notifications_active_outlined),
+            ),
+          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())

@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../services/auth_service.dart';
 import '../services/incident_service.dart';
+import 'photo_capture_screen.dart';
 
 class ReportIncidentScreen extends StatefulWidget {
   const ReportIncidentScreen({
@@ -399,11 +400,33 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       withData: false,
     );
 
-    if (result == null || result.files.isEmpty) {
+    if (result == null || result.files.isEmpty || !mounted) {
       return;
     }
 
-    final combined = <PlatformFile>[..._evidence, ...result.files];
+    _addEvidence(result.files);
+  }
+
+  Future<void> _takeEvidencePhoto() async {
+    if (_evidence.length >= _maxFiles) {
+      _showMessage('Maximum $_maxFiles evidence files are allowed.');
+      return;
+    }
+
+    final photo = await capturePhotoInApp(
+      context,
+      title: 'Take Incident Evidence Photo',
+    );
+
+    if (photo == null || !mounted) {
+      return;
+    }
+
+    _addEvidence(<PlatformFile>[photo]);
+  }
+
+  void _addEvidence(List<PlatformFile> files) {
+    final combined = <PlatformFile>[..._evidence, ...files];
 
     if (combined.length > _maxFiles) {
       _showMessage('Maximum $_maxFiles evidence files are allowed.');
@@ -413,6 +436,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     final maximumBytes = _maxKilobytesEach * 1024;
 
     for (final file in combined) {
+      if (file.path == null || file.path!.trim().isEmpty) {
+        _showMessage('${file.name} could not be accessed.');
+        return;
+      }
+
       if (file.size > maximumBytes) {
         _showMessage(
           '${file.name} exceeds '
@@ -1169,12 +1197,27 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: _submitting ? null : _pickEvidence,
+            onPressed: _submitting || _evidence.length >= _maxFiles
+                ? null
+                : _takeEvidencePhoto,
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: Text(
+              _evidence.isEmpty ? 'Take Evidence Photo' : 'Take Another Photo',
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _submitting || _evidence.length >= _maxFiles
+                ? null
+                : _pickEvidence,
             icon: const Icon(Icons.attach_file_rounded),
             label: Text(
               _evidence.isEmpty
-                  ? 'Choose Evidence'
-                  : 'Add More Evidence '
+                  ? 'Choose Existing Evidence'
+                  : 'Add Existing Evidence '
                         '(${_evidence.length}/$_maxFiles)',
             ),
           ),

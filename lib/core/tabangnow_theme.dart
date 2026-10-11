@@ -55,7 +55,8 @@ class TabangNowTheme {
     final accent = theme.colorScheme.primary;
     final isDefaultAccent = accent.toARGB32() == 0xFF2563EB;
 
-    final surface = isDark ? const Color(0xFF0F172A) : const Color(0xFFFFFFFF);
+    final surface = theme.colorScheme.surface;
+    final pageBackground = theme.scaffoldBackgroundColor;
 
     final accentSoft = isDefaultAccent
         ? (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFDBEAFE))
@@ -74,19 +75,38 @@ class TabangNowTheme {
 
     return TabangNowTheme._(
       isDark: isDark,
-      pageBackground: isDark
-          ? const Color(0xFF020617)
-          : const Color(0xFFF1F5F9),
+      pageBackground: pageBackground,
       surface: surface,
-      surfaceMuted: isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC),
-      surfaceSoft: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-      border: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-      borderStrong: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+      surfaceMuted: isDark
+          ? const Color(0xFF111827)
+          : isDefaultAccent
+          ? const Color(0xFFF8FAFC)
+          : Color.alphaBlend(
+              accent.withValues(alpha: 0.055),
+              const Color(0xFFF8FAFC),
+            ),
+      surfaceSoft: isDark
+          ? const Color(0xFF1E293B)
+          : isDefaultAccent
+          ? const Color(0xFFF1F5F9)
+          : Color.alphaBlend(
+              accent.withValues(alpha: 0.10),
+              const Color(0xFFF1F5F9),
+            ),
+      border: theme.colorScheme.outlineVariant,
+      borderStrong: theme.colorScheme.outline,
       textMain: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
       textSoft: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
       textMuted: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
       textFaint: const Color(0xFF94A3B8),
-      ring: isDark ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
+      ring: isDark
+          ? const Color(0xFF1D4ED8)
+          : isDefaultAccent
+          ? const Color(0xFFBFDBFE)
+          : Color.alphaBlend(
+              accent.withValues(alpha: 0.38),
+              surface,
+            ),
       accent: accent,
       accentHover: Color.alphaBlend(
         Colors.black.withValues(alpha: 0.14),

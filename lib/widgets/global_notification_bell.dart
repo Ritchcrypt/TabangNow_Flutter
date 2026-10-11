@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/auth_service.dart';
 import '../services/notification_center_service.dart';
@@ -26,9 +25,6 @@ class GlobalNotificationBell extends StatefulWidget {
 
 class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
   static const Duration _pollInterval = Duration(seconds: 15);
-  static const MethodChannel _notificationFeedbackChannel = MethodChannel(
-    'tabangnow/notification_feedback',
-  );
 
   late final NotificationCenterService _service;
 
@@ -115,16 +111,12 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
     }
 
     if (event.isEmergency) {
-      await _playUrgentEmergencyFeedback();
-
       if (mounted) {
         _showEmergencyBanner(notification);
       }
 
       return;
     }
-
-    await _playStandardNotificationFeedback();
 
     if (mounted) {
       _showNotificationBanner(notification);
@@ -148,8 +140,7 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
       if (_notifications.isNotEmpty) {
         await _surfaceInitialUnread();
       }
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<void> _surfaceInitialUnread() async {
@@ -161,16 +152,12 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
     final type = latest['type']?.toString().trim().toLowerCase() ?? '';
 
     if (type == 'mobile_emergency') {
-      await _playUrgentEmergencyFeedback();
-
       if (mounted) {
         _showEmergencyBanner(latest);
       }
 
       return;
     }
-
-    await _playStandardNotificationFeedback();
 
     if (mounted) {
       _showNotificationBanner(latest, initialUnreadCount: _unreadCount);
@@ -212,7 +199,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
           _latestId = latest;
         }
 
-        await _playUrgentEmergencyFeedback();
         await _loadBell();
 
         if (mounted) {
@@ -225,8 +211,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
       if (hasNewNotification) {
         _latestId = latest;
 
-        await SystemSound.play(SystemSoundType.alert);
-        await HapticFeedback.lightImpact();
         await _loadBell();
 
         if (mounted) {
@@ -237,23 +221,6 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
     } finally {
       _requestRunning = false;
     }
-  }
-
-  Future<void> _playStandardNotificationFeedback() async {
-    try {
-      await _notificationFeedbackChannel.invokeMethod<void>(
-        'playNotificationFeedback',
-      );
-      return;
-    } catch (_) {
-    }
-
-    await SystemSound.play(SystemSoundType.alert);
-    await HapticFeedback.mediumImpact();
-  }
-
-  Future<void> _playUrgentEmergencyFeedback() async {
-    await _playStandardNotificationFeedback();
   }
 
   void _showEmergencyBanner(Object? rawNotification) {

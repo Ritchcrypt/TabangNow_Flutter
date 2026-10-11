@@ -562,6 +562,8 @@ class _TanodCard extends StatelessWidget {
         : _humanize(status);
 
     final dateAppointed = _display(tanod['date_appointed']);
+    final autoDutyEnabled = tanod['auto_duty_enabled'] == true;
+    final scheduledDutyLabel = _display(tanod['scheduled_duty_label']);
 
     return Container(
       decoration: BoxDecoration(
@@ -662,6 +664,13 @@ class _TanodCard extends StatelessWidget {
                 _InfoChip(label: 'Purok', value: purok),
                 _InfoChip(label: 'Shift', value: shift),
                 _InfoChip(label: 'Appointed', value: dateAppointed),
+                if (autoDutyEnabled)
+                  _InfoChip(
+                    label: 'Auto Duty',
+                    value: scheduledDutyLabel == '—'
+                        ? 'Scheduled'
+                        : scheduledDutyLabel,
+                  ),
               ],
             ),
 
@@ -883,6 +892,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
   late final TextEditingController _notesController;
 
   bool _busy = false;
+  bool _autoDutyEnabled = false;
   late String _shift;
   late String _status;
 
@@ -927,6 +937,8 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
       widget.statusOptions,
       fallback: 'active',
     );
+
+    _autoDutyEnabled = initial['auto_duty_enabled'] == true;
   }
 
   @override
@@ -953,7 +965,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
       context: context,
       initialDate: initialDate,
       firstDate: DateTime(1950),
-      lastDate: DateTime.now(),
+      lastDate: DateTime(DateTime.now().year + 5, 12, 31),
     );
 
     if (selected == null || !mounted) {
@@ -999,6 +1011,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
           dateAppointed: _dateController.text,
           shift: _shift,
           status: _status,
+          autoDutyEnabled: _autoDutyEnabled,
           notes: _notesController.text,
         );
       } else {
@@ -1010,6 +1023,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
           dateAppointed: _dateController.text,
           shift: _shift,
           status: _status,
+          autoDutyEnabled: _autoDutyEnabled,
           notes: _notesController.text,
         );
       }
@@ -1143,8 +1157,10 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
                 readOnly: true,
                 onTap: _pickDate,
                 decoration: InputDecoration(
-                  labelText: 'Date Appointed',
+                  labelText: 'Date Appointed / Duty Start',
                   hintText: 'YYYY-MM-DD',
+                  helperText:
+                      'Future dates are allowed. Auto duty uses this date plus the selected shift start time.',
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
@@ -1166,6 +1182,13 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
                     ],
                   ),
                 ),
+                validator: (_) {
+                  if (_autoDutyEnabled && _dateController.text.trim().isEmpty) {
+                    return 'Choose a duty start date when auto activation is enabled.';
+                  }
+
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
 
@@ -1217,6 +1240,23 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
                           _status = value;
                         });
                       },
+              ),
+              const SizedBox(height: 12),
+
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: _autoDutyEnabled,
+                onChanged: _busy
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _autoDutyEnabled = value;
+                        });
+                      },
+                title: const Text('Auto activate On Duty'),
+                subtitle: const Text(
+                  'At the selected date and shift start, status changes to On Duty once. You can still edit status, shift, date, or disable this schedule.',
+                ),
               ),
               const SizedBox(height: 12),
 

@@ -65,42 +65,39 @@ void main() {
     );
   });
 
-  test(
-    'Activity Logs screen replicates website filters and rows',
-    () {
-      final screen = File(
-        'lib/screens/activity_logs_screen.dart',
-      ).readAsStringSync();
+  test('Activity Logs screen replicates website filters and rows', () {
+    final screen = File(
+      'lib/screens/activity_logs_screen.dart',
+    ).readAsStringSync();
 
-      for (final marker in <String>[
-        'SECURITY AUDIT TRAIL',
-        "'Activity Logs'",
-        'Actor, event, description, route, or IP',
-        'All categories',
-        'All events',
-        'All actors',
-        'Date from',
-        'Date to',
-        '10',
-        '25',
-        '50',
-        '100',
-        'matching records',
-        'System / Unknown',
-        'No actor role',
-        'View activity log',
-        'No activity logs matched the selected filters.',
-        'Clear the filters or choose a wider date range.',
-        '_deleteAllPermanently',
-      ]) {
-        expect(
-          screen,
-          contains(marker),
-          reason: 'Missing Activity Logs index marker: $marker',
-        );
-      }
-    },
-  );
+    for (final marker in <String>[
+      'SECURITY AUDIT TRAIL',
+      "'Activity Logs'",
+      'Actor, event, description, route, or IP',
+      'All categories',
+      'All events',
+      'All actors',
+      'Date from',
+      'Date to',
+      '10',
+      '25',
+      '50',
+      '100',
+      'matching records',
+      'System / Unknown',
+      'No actor role',
+      'View activity log',
+      'No activity logs matched the selected filters.',
+      'Clear the filters or choose a wider date range.',
+      '_deleteAllPermanently',
+    ]) {
+      expect(
+        screen,
+        contains(marker),
+        reason: 'Missing Activity Logs index marker: $marker',
+      );
+    }
+  });
 
   test(
     'Activity Log detail includes exact audit sections and metadata redaction notice',
@@ -202,7 +199,27 @@ void main() {
 
       expect(home, contains('_openAccountProfile'));
 
-      expect(home, isNot(contains('UserManagementDetailScreen(')));
+      final profileStart = home.indexOf(
+        'Future<void> _openAccountProfile() async {',
+      );
+
+      expect(profileStart, greaterThanOrEqualTo(0));
+
+      final notificationStart = home.indexOf(
+        'Future<void> _openGlobalNotification(',
+        profileStart,
+      );
+
+      expect(notificationStart, greaterThan(profileStart));
+
+      final profileFlow = home.substring(profileStart, notificationStart);
+
+      expect(
+        profileFlow,
+        isNot(contains('UserManagementDetailScreen(')),
+        reason:
+            'Current-account profile flow must not open User Management detail.',
+      );
 
       expect(home, contains('CurrentAccountProfileScreen('));
     },

@@ -69,30 +69,52 @@ class TabangNowThemeController {
       _ => Brightness.light,
     };
 
-    final accent = settings.mode == TabangNowThemeMode.custom
+    final isCustom = settings.mode == TabangNowThemeMode.custom;
+
+    final accent = isCustom
         ? settings.customColor ?? const Color(0xFF2563EB)
         : const Color(0xFF2563EB);
 
     final isDark = brightness == Brightness.dark;
 
-    final pageBackground = isDark
+    final neutralPageBackground = isDark
         ? const Color(0xFF020617)
         : const Color(0xFFF1F5F9);
 
-    final surface = isDark ? const Color(0xFF0F172A) : const Color(0xFFFFFFFF);
+    final neutralSurface = isDark
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFFFFFFF);
+
+    final pageBackground = isCustom
+        ? Color.alphaBlend(accent.withValues(alpha: 0.045), const Color(0xFFF8FAFC))
+        : neutralPageBackground;
+
+    final surface = isCustom
+        ? Color.alphaBlend(accent.withValues(alpha: 0.018), Colors.white)
+        : neutralSurface;
 
     final surfaceMuted = isDark
         ? const Color(0xFF111827)
+        : isCustom
+        ? Color.alphaBlend(accent.withValues(alpha: 0.055), const Color(0xFFF8FAFC))
         : const Color(0xFFF8FAFC);
 
     final surfaceSoft = isDark
         ? const Color(0xFF1E293B)
+        : isCustom
+        ? Color.alphaBlend(accent.withValues(alpha: 0.10), const Color(0xFFF1F5F9))
         : const Color(0xFFF1F5F9);
 
-    final border = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final border = isDark
+        ? const Color(0xFF334155)
+        : isCustom
+        ? Color.alphaBlend(accent.withValues(alpha: 0.14), const Color(0xFFE2E8F0))
+        : const Color(0xFFE2E8F0);
 
     final borderStrong = isDark
         ? const Color(0xFF475569)
+        : isCustom
+        ? Color.alphaBlend(accent.withValues(alpha: 0.20), const Color(0xFFCBD5E1))
         : const Color(0xFFCBD5E1);
 
     final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
@@ -108,6 +130,15 @@ class TabangNowThemeController {
     final primaryForeground = accent.computeLuminance() > 0.55
         ? const Color(0xFF0F172A)
         : Colors.white;
+
+    final snackBarActionText = isCustom
+        ? Color.alphaBlend(
+            Colors.white.withValues(alpha: 0.42),
+            accent,
+          )
+        : isDark
+        ? const Color(0xFFBFDBFE)
+        : const Color(0xFF93C5FD);
 
     final scheme =
         ColorScheme.fromSeed(
@@ -149,7 +180,12 @@ class TabangNowThemeController {
       ),
 
       navigationDrawerTheme: base.navigationDrawerTheme.copyWith(
-        backgroundColor: const Color(0xFF172554),
+        backgroundColor: isCustom
+            ? Color.alphaBlend(
+                accent.withValues(alpha: 0.34),
+                const Color(0xFF0F172A),
+              )
+            : const Color(0xFF172554),
       ),
 
       iconTheme: IconThemeData(color: textSoft),
@@ -166,15 +202,15 @@ class TabangNowThemeController {
         suffixIconColor: textMuted,
         border: OutlineInputBorder(
           borderSide: BorderSide(color: borderStrong),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
         ),
         enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(color: borderStrong),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: accent, width: 2),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
         ),
       ),
 
@@ -243,9 +279,7 @@ class TabangNowThemeController {
             ? const Color(0xFF1E293B)
             : const Color(0xFF0F172A),
         contentTextStyle: const TextStyle(color: Colors.white),
-        actionTextColor: isDark
-            ? const Color(0xFFBFDBFE)
-            : const Color(0xFF93C5FD),
+        actionTextColor: snackBarActionText,
       ),
 
       checkboxTheme: CheckboxThemeData(
@@ -313,7 +347,7 @@ class TabangNowThemeController {
       splashColor: accent.withValues(alpha: 0.08),
       disabledColor: textFaint.withValues(alpha: 0.45),
       primaryColor: accent,
-      shadowColor: const Color(0x2E020617),
+      shadowColor: const Color(0x16020617),
       hintColor: textFaint,
     );
   }
