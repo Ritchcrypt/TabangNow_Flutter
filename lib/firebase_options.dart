@@ -21,10 +21,10 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCxDkLmcofOzk9F2urMvTMEuFTOhWMePgk',
-    appId: '1:625615610968:android:41c12b63bb10b08012162d',
-    messagingSenderId: '625615610968',
-    projectId: 'tabangnow',
-    storageBucket: 'tabangnow.firebasestorage.app',
+    apiKey: 'AIzaSyD5tWzFW1ZT8DV54SLyU7DtkfiL0pqYkCw',
+    appId: '1:319845589777:android:b4e690573cdf81fe01e2b0',
+    messagingSenderId: '319845589777',
+    projectId: 'tabangnow-mobile-2026',
+    storageBucket: 'tabangnow-mobile-2026.firebasestorage.app',
   );
 }

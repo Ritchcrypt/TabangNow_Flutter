@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "625615610968",
-    "project_id": "tabangnow",
-    "storage_bucket": "tabangnow.firebasestorage.app"
+    "project_number": "319845589777",
+    "project_id": "tabangnow-mobile-2026",
+    "storage_bucket": "tabangnow-mobile-2026.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:625615610968:android:41c12b63bb10b08012162d",
+        "mobilesdk_app_id": "1:319845589777:android:b4e690573cdf81fe01e2b0",
         "android_client_info": {
           "package_name": "ph.tabangnow.dao"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCxDkLmcofOzk9F2urMvTMEuFTOhWMePgk"
+          "current_key": "AIzaSyD5tWzFW1ZT8DV54SLyU7DtkfiL0pqYkCw"
         }
       ],
       "services": {
