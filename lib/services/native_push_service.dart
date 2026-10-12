@@ -131,19 +131,26 @@ class NativePushService with WidgetsBindingObserver {
   AuthService? _authenticatedAuthService;
   bool _initialized = false;
   bool _ready = false;
+  bool _observerAttached = false;
+  bool _listenersAttached = false;
+  bool _backgroundHandlerRegistered = false;
 
   Future<void> initialize() async {
-    if (_initialized) {
+    if (_ready && _messaging != null) {
       return;
+    }
+
+    if (!Platform.isAndroid) {
+      _initialized = true;
+      return;
+    }
+
+    if (!_observerAttached) {
+      WidgetsBinding.instance.addObserver(this);
+      _observerAttached = true;
     }
 
     _initialized = true;
-
-    if (!Platform.isAndroid) {
-      return;
-    }
-
-    WidgetsBinding.instance.addObserver(this);
 
     try {
       final launchData = await TabangNowNotificationAlert.initializeMain(
@@ -168,9 +175,12 @@ class NativePushService with WidgetsBindingObserver {
       final messaging = FirebaseMessaging.instance;
       _messaging = messaging;
 
-      FirebaseMessaging.onBackgroundMessage(
-        tabangNowFirebaseMessagingBackgroundHandler,
-      );
+      if (!_backgroundHandlerRegistered) {
+        FirebaseMessaging.onBackgroundMessage(
+          tabangNowFirebaseMessagingBackgroundHandler,
+        );
+        _backgroundHandlerRegistered = true;
+      }
 
       await messaging.setAutoInitEnabled(true);
 
@@ -182,19 +192,25 @@ class NativePushService with WidgetsBindingObserver {
         );
       } catch (_) {}
 
-      FirebaseMessaging.onMessage.listen((message) {
-        NativePushBridge.received(message);
-      });
+      if (!_listenersAttached) {
+        FirebaseMessaging.onMessage.listen((message) {
+          NativePushBridge.received(message);
+        });
 
-      FirebaseMessaging.onMessageOpenedApp.listen(NativePushBridge.opened);
+        FirebaseMessaging.onMessageOpenedApp.listen(NativePushBridge.opened);
 
-      messaging.onTokenRefresh.listen((token) {
-        final authService = _authenticatedAuthService;
+        messaging.onTokenRefresh.listen((token) {
+          final authService = _authenticatedAuthService;
 
-        if (authService != null && token.trim().isNotEmpty) {
-          unawaited(_registerToken(token.trim(), authService));
-        }
-      });
+          if (authService != null && token.trim().isNotEmpty) {
+            debugPrint('[TabangNow Push] FCM token refreshed.');
+
+            unawaited(_registerToken(token.trim(), authService));
+          }
+        });
+
+        _listenersAttached = true;
+      }
 
       final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
@@ -202,20 +218,40 @@ class NativePushService with WidgetsBindingObserver {
       }
 
       _ready = true;
-    } catch (_) {
+    } catch (exception, stackTrace) {
       _messaging = null;
       _ready = false;
+      _initialized = false;
+
+      debugPrint('[TabangNow Push] Firebase initialization FAILED: $exception');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   Future<void> syncForAuthenticatedUser(AuthService authService) async {
+    _authenticatedAuthService = authService;
+
+    /*
+     * The application may have experienced a temporary Firebase startup
+     * failure before authentication completed. Retry here instead of leaving
+     * the device permanently unregistered.
+     */
+    if (!_ready || _messaging == null) {
+      debugPrint(
+        '[TabangNow Push] Firebase not ready; retrying initialization.',
+      );
+
+      await initialize();
+    }
+
     final messaging = _messaging;
 
     if (!_ready || messaging == null) {
+      debugPrint(
+        '[TabangNow Push] Registration aborted: Firebase unavailable.',
+      );
       return;
     }
-
-    _authenticatedAuthService = authService;
 
     try {
       final settings = await messaging.requestPermission(
@@ -224,19 +260,35 @@ class NativePushService with WidgetsBindingObserver {
         sound: true,
       );
 
+      debugPrint(
+        '[TabangNow Push] Permission: '
+        '${settings.authorizationStatus}',
+      );
+
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
-        await _revokeServerRegistration(authService);
+        debugPrint('[TabangNow Push] Notification permission denied.');
         return;
       }
 
       final token = (await messaging.getToken())?.trim() ?? '';
 
       if (token.isEmpty) {
-        return;
+        throw StateError('Firebase returned an empty FCM token.');
       }
 
+      debugPrint(
+        '[TabangNow Push] FCM token acquired '
+        '(length=${token.length}).',
+      );
+
       await _registerToken(token, authService);
-    } catch (_) {}
+
+      debugPrint('[TabangNow Push] DEVICE REGISTRATION SUCCESS.');
+    } catch (exception, stackTrace) {
+      debugPrint('[TabangNow Push] DEVICE REGISTRATION FAILED: $exception');
+
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> unregisterForAuthenticatedUser(AuthService authService) async {
@@ -282,8 +334,16 @@ class NativePushService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(TabangNowNotificationAlert.stopPersistentAlert());
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+
+    unawaited(TabangNowNotificationAlert.stopPersistentAlert());
+
+    final authService = _authenticatedAuthService;
+
+    if (authService != null) {
+      unawaited(syncForAuthenticatedUser(authService));
     }
   }
 
@@ -313,13 +373,19 @@ class NativePushService with WidgetsBindingObserver {
         )
         .timeout(_requestTimeout);
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      return;
-    }
+    debugPrint(
+      '[TabangNow Push] Laravel push-token HTTP '
+      '${response.statusCode}.',
+    );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      final responseText = response.body.length > 500
+          ? response.body.substring(0, 500)
+          : response.body;
+
       throw StateError(
-        'Push token registration failed with HTTP ${response.statusCode}.',
+        'Push token registration failed with HTTP '
+        '${response.statusCode}: $responseText',
       );
     }
   }
