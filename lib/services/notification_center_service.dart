@@ -50,6 +50,24 @@ class NotificationCenterService {
     return _decodeAuthorized(response);
   }
 
+  Future<Map<String, dynamic>> markAllRead() async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/v1/notifications/read-all'),
+      headers: await _headers(),
+    );
+
+    return _decodeAuthorized(response);
+  }
+
+  Future<Map<String, dynamic>> deleteNotification(int notificationId) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/api/v1/notifications/$notificationId'),
+      headers: await _headers(),
+    );
+
+    return _decodeAuthorized(response);
+  }
+
   Future<NotificationOpenTarget> open(int notificationId) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/api/v1/notifications/$notificationId/open'),

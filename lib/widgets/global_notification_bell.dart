@@ -404,6 +404,90 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
     }
   }
 
+  Future<void> _markAllRead() async {
+    if (_unreadCount <= 0) {
+      return;
+    }
+
+    try {
+      await _service.markAllRead();
+      await _loadBell();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('All notifications marked as read.')),
+        );
+    } on AuthException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(exception.userMessage)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Unable to mark notifications as read.'),
+          ),
+        );
+    }
+  }
+
+  Future<void> _deleteNotification(Map<String, dynamic> notification) async {
+    final id = _asInt(notification['id']);
+
+    if (id <= 0) {
+      return;
+    }
+
+    try {
+      await _service.deleteNotification(id);
+      await _loadBell();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Notification deleted from your account only.'),
+          ),
+        );
+    } on AuthException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(exception.userMessage)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Unable to delete the notification.')),
+        );
+    }
+  }
+
   Future<void> _showNotifications() async {
     await _loadBell();
 
@@ -422,6 +506,14 @@ class _GlobalNotificationBellState extends State<GlobalNotificationBell> {
           onOpen: (notification) async {
             Navigator.of(sheetContext).pop();
             await _openNotification(notification);
+          },
+          onMarkAllRead: () async {
+            Navigator.of(sheetContext).pop();
+            await _markAllRead();
+          },
+          onDelete: (notification) async {
+            Navigator.of(sheetContext).pop();
+            await _deleteNotification(notification);
           },
         );
       },
@@ -514,11 +606,15 @@ class _NotificationSheet extends StatelessWidget {
     required this.unreadCount,
     required this.notifications,
     required this.onOpen,
+    required this.onMarkAllRead,
+    required this.onDelete,
   });
 
   final int unreadCount;
   final List<Map<String, dynamic>> notifications;
   final Future<void> Function(Map<String, dynamic> notification) onOpen;
+  final Future<void> Function() onMarkAllRead;
+  final Future<void> Function(Map<String, dynamic> notification) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -530,7 +626,7 @@ class _NotificationSheet extends StatelessWidget {
         child: Column(
           children: <Widget>[
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
               child: Row(
                 children: <Widget>[
                   const Expanded(
@@ -552,6 +648,15 @@ class _NotificationSheet extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (unreadCount > 0)
+                    TextButton.icon(
+                      onPressed: () {
+                        unawaited(onMarkAllRead());
+                      },
+                      icon: const Icon(Icons.done_all_rounded, size: 18),
+                      label: const Text('Read all'),
+                    ),
+                  const SizedBox(width: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -584,70 +689,134 @@ class _NotificationSheet extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final item = notifications[index];
 
-                        return InkWell(
-                          onTap: () => onOpen(item),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 4,
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  unawaited(onOpen(item));
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    14,
+                                    8,
+                                    14,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDBEAFE),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    (item['type_label']?.toString() ??
-                                            'Notification')
-                                        .toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Color(0xFF1D4ED8),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  item['message']?.toString() ??
-                                      'No notification message provided.',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.5,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 7),
-                                Row(
-                                  children: <Widget>[
-                                    Expanded(
-                                      child: Text(
-                                        item['age']?.toString() ?? 'No date',
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 9,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFDBEAFE),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          (item['type_label']?.toString() ??
+                                                  'Notification')
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF1D4ED8),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        item['message']?.toString() ??
+                                            'No notification message provided.',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12,
+                                          height: 1.5,
                                           color: theme
                                               .colorScheme
                                               .onSurfaceVariant,
                                         ),
                                       ),
-                                    ),
-                                    Text(
-                                      'Open →',
-                                      style: TextStyle(
-                                        color: theme.colorScheme.primary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
+                                      const SizedBox(height: 7),
+                                      Row(
+                                        children: <Widget>[
+                                          Expanded(
+                                            child: Text(
+                                              item['age']?.toString() ??
+                                                  'No date',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            'Open →',
+                                            style: TextStyle(
+                                              color: theme.colorScheme.primary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 9, right: 6),
+                              child: IconButton(
+                                tooltip: 'Delete from my notifications',
+                                icon: const Icon(Icons.delete_outline_rounded),
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (dialogContext) {
+                                      return AlertDialog(
+                                        title: const Text(
+                                          'Delete notification?',
+                                        ),
+                                        content: const Text(
+                                          'This removes only your received copy. Other users keep their own copies.',
+                                        ),
+                                        actions: <Widget>[
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.of(
+                                                dialogContext,
+                                              ).pop(false);
+                                            },
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () {
+                                              Navigator.of(
+                                                dialogContext,
+                                              ).pop(true);
+                                            },
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+
+                                  if (confirmed == true) {
+                                    await onDelete(item);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),

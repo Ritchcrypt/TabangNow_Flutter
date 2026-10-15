@@ -196,9 +196,7 @@ class TabangNowNotificationAlert {
         description: lowChannelDescription,
         importance: Importance.defaultImportance,
         playSound: true,
-        sound: const RawResourceAndroidNotificationSound(
-          'tabangnow_low_v1',
-        ),
+        sound: const RawResourceAndroidNotificationSound('tabangnow_low_v1'),
         enableVibration: true,
         vibrationPattern: _lowVibrationPattern,
         showBadge: true,
@@ -372,9 +370,7 @@ class TabangNowNotificationAlert {
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
           playSound: true,
-          sound: const RawResourceAndroidNotificationSound(
-            'tabangnow_low_v1',
-          ),
+          sound: const RawResourceAndroidNotificationSound('tabangnow_low_v1'),
           enableVibration: true,
           vibrationPattern: _lowVibrationPattern,
           autoCancel: true,
@@ -445,9 +441,7 @@ class TabangNowNotificationAlert {
     );
   }
 
-  static Future<_AlertDecision> _safeArbitrate(
-    TabangNowAlertTier tier,
-  ) async {
+  static Future<_AlertDecision> _safeArbitrate(TabangNowAlertTier tier) async {
     try {
       return await _arbitrate(tier);
     } catch (_) {
@@ -656,10 +650,7 @@ class TabangNowNotificationAlert {
       final state = await _readArbiterState(stateFile);
       final result = action(state);
 
-      await stateFile.writeAsString(
-        jsonEncode(state.toJson()),
-        flush: true,
-      );
+      await stateFile.writeAsString(jsonEncode(state.toJson()), flush: true);
 
       return result;
     } finally {
@@ -688,9 +679,7 @@ class TabangNowNotificationAlert {
         return _AlertArbiterState();
       }
 
-      return _AlertArbiterState.fromJson(
-        Map<String, dynamic>.from(decoded),
-      );
+      return _AlertArbiterState.fromJson(Map<String, dynamic>.from(decoded));
     } catch (_) {
       return _AlertArbiterState();
     }
@@ -824,27 +813,71 @@ class TabangNowNotificationAlert {
   }
 
   static TabangNowAlertTier _tierFromData(Map<String, dynamic> data) {
-    final explicitTier =
-        (data['alert_tier']?.toString() ?? '').trim().toLowerCase();
+    final type = (data['type']?.toString() ?? '').trim().toLowerCase();
 
+    /*
+     * TabangNow MOBILE Code Red policy.
+     *
+     * Only:
+     * - Incidents
+     * - Distress Signal
+     * - Announcements
+     *
+     * may use the existing Critical / Code Red alarm.
+     *
+     * The existing Code Red sound/channel is intentionally untouched.
+     */
+    const codeRedTypes = <String>{
+      // Announcements
+      'announcement',
+      'calamity',
+
+      // Distress Signal
+      'mobile_emergency',
+      'mobile_emergency_received',
+      'mobile_emergency_acknowledged',
+      'mobile_emergency_resolved',
+
+      // Incidents
+      'incident',
+      'incident_reported',
+      'incident_message',
+      'incident_update',
+      'incident_updated',
+      'incident_status_update',
+      'status_update',
+      'assigned_incident',
+      'incident_assigned',
+      'new_assigned_incident',
+      'dispatch',
+      'escalation',
+      'emergency',
+      'resolved',
+    };
+
+    if (codeRedTypes.contains(type)) {
+      return TabangNowAlertTier.critical;
+    }
+
+    final explicitTier = (data['alert_tier']?.toString() ?? '')
+        .trim()
+        .toLowerCase();
+
+    /*
+     * Protect Code Red from all other modules.
+     *
+     * If an older/current backend marks another category critical,
+     * mobile intentionally demotes it to Moderate.
+     */
     switch (explicitTier) {
       case 'critical':
-        return TabangNowAlertTier.critical;
+        return TabangNowAlertTier.moderate;
       case 'moderate':
         return TabangNowAlertTier.moderate;
       case 'low':
         return TabangNowAlertTier.low;
       case 'silent':
         return TabangNowAlertTier.silent;
-    }
-
-    // Backward-compatible safety fallback for an older server payload. Only
-    // explicit emergency types may become Code Red. Everything unknown is LOW.
-    final type = (data['type']?.toString() ?? '').trim().toLowerCase();
-    if (type == 'mobile_emergency' ||
-        type == 'emergency' ||
-        type == 'calamity') {
-      return TabangNowAlertTier.critical;
     }
 
     return TabangNowAlertTier.low;
