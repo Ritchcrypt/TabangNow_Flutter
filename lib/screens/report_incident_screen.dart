@@ -74,6 +74,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   DateTime? _lastMapSearchAt;
   final Map<String, _MapSearchResult> _mapCache = <String, _MapSearchResult>{};
 
+  String get _role =>
+      widget.user['role']?.toString().trim().toLowerCase() ?? '';
+
+  bool get _canAssessSeverity =>
+      _role == 'admin' || _role == 'official' || _role == 'dao';
+
   bool get _canManageBarangays => _permissions['can_manage_barangays'] == true;
 
   @override
@@ -133,9 +139,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           _barangayId = _containsId(_barangays, oldBarangay)
               ? oldBarangay
               : null;
-          _priority = _containsValue(_severities, oldPriority)
-              ? oldPriority
-              : null;
+          _priority = _canAssessSeverity
+              ? (_containsValue(_severities, oldPriority) ? oldPriority : null)
+              : 'low';
         }
 
         _loading = false;
@@ -631,9 +637,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       return;
     }
 
-    if (_categoryId == null || _barangayId == null || _priority == null) {
+    if (_categoryId == null || _barangayId == null) {
       setState(() {
-        _error = 'Select a category, barangay, and severity.';
+        _error = 'Select a category and barangay.';
+      });
+      return;
+    }
+
+    if (_canAssessSeverity && _priority == null) {
+      setState(() {
+        _error = 'Select a severity after assessing the incident.';
       });
       return;
     }
@@ -649,7 +662,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         description: _descriptionController.text,
         categoryId: _categoryId!,
         barangayId: _barangayId!,
-        priority: _priority!,
+        priority: _canAssessSeverity ? (_priority ?? 'low') : 'low',
         locationAddress: _locationController.text,
         latitude: _selectedPoint?.latitude,
         longitude: _selectedPoint?.longitude,
@@ -870,34 +883,61 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           validator: (value) => value == null ? 'Select a category.' : null,
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _priority,
-          decoration: const InputDecoration(
-            labelText: 'Severity',
-            border: OutlineInputBorder(),
+        if (_canAssessSeverity)
+          DropdownButtonFormField<String>(
+            initialValue: _priority,
+            decoration: const InputDecoration(
+              labelText: 'Severity',
+              helperText: 'Assign severity after assessing the incident.',
+              border: OutlineInputBorder(),
+            ),
+            items: _severities
+                .map((item) {
+                  final value = item['value']?.toString().trim();
+
+                  if (value == null || value.isEmpty) {
+                    return null;
+                  }
+
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(item['label']?.toString() ?? value),
+                  );
+                })
+                .whereType<DropdownMenuItem<String>>()
+                .toList(),
+            onChanged: (value) {
+              setState(() {
+                _priority = value;
+              });
+            },
+            validator: (value) => value == null ? 'Select a severity.' : null,
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: TabangNowTheme.of(context).surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: TabangNowTheme.of(context).border,
+              ),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Severity assessment',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Severity will be assigned by an administrator or Dao official after the situation is assessed.',
+                ),
+              ],
+            ),
           ),
-          items: _severities
-              .map((item) {
-                final value = item['value']?.toString().trim();
-
-                if (value == null || value.isEmpty) {
-                  return null;
-                }
-
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(item['label']?.toString() ?? value),
-                );
-              })
-              .whereType<DropdownMenuItem<String>>()
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _priority = value;
-            });
-          },
-          validator: (value) => value == null ? 'Select a severity.' : null,
-        ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _descriptionController,

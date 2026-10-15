@@ -28,12 +28,18 @@ class _ResidentComplaintCreateScreenState
 
   final _contactController = TextEditingController();
 
+  final _subjectController = TextEditingController();
+
   final _addressController = TextEditingController();
 
   final _descriptionController = TextEditingController();
 
   PlatformFile? _evidence;
   bool _saving = false;
+
+  String _feedbackCategory = 'community_concern';
+  String _feedbackType = 'concern';
+  int? _serviceRating;
 
   @override
   void initState() {
@@ -48,6 +54,7 @@ class _ResidentComplaintCreateScreenState
   void dispose() {
     _nameController.dispose();
     _contactController.dispose();
+    _subjectController.dispose();
     _addressController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -70,7 +77,7 @@ class _ResidentComplaintCreateScreenState
   Future<void> _takeEvidencePhoto() async {
     final photo = await capturePhotoInApp(
       context,
-      title: 'Take Complaint Evidence Photo',
+      title: 'Take Supporting Feedback Photo',
     );
 
     if (photo == null || !mounted) {
@@ -117,9 +124,13 @@ class _ResidentComplaintCreateScreenState
 
     try {
       final response = await widget.service.create(
+        feedbackCategory: _feedbackCategory,
+        feedbackType: _feedbackType,
+        feedbackSubject: _subjectController.text,
+        serviceRating: _serviceRating,
         complainantName: _nameController.text,
         contactNumber: _nullable(_contactController.text),
-        complaintAddress: _addressController.text,
+        complaintAddress: _nullable(_addressController.text),
         complaintDescription: _descriptionController.text,
         evidencePath: _evidence?.path,
       );
@@ -129,7 +140,7 @@ class _ResidentComplaintCreateScreenState
       }
 
       Navigator.of(context).pop(
-        response['message']?.toString() ?? 'Complaint submitted successfully.',
+        response['message']?.toString() ?? 'Feedback submitted successfully.',
       );
     } catch (exception) {
       if (!mounted) {
@@ -150,7 +161,7 @@ class _ResidentComplaintCreateScreenState
 
     return Scaffold(
       backgroundColor: palette.pageBackground,
-      appBar: AppBar(title: const Text('Submit Complaint')),
+      appBar: AppBar(title: const Text('Send Resident Feedback')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -161,7 +172,7 @@ class _ResidentComplaintCreateScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    'Submit Complaint',
+                    'Send Resident Feedback',
                     style: TextStyle(
                       color: palette.textMain,
                       fontSize: 24,
@@ -170,7 +181,7 @@ class _ResidentComplaintCreateScreenState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Report a non-emergency community concern to the barangay office.',
+                    'Share feedback about TabangNow, barangay services, staff response and actions, community concerns, or suggestions.',
                     style: TextStyle(color: palette.textMuted),
                   ),
                 ],
@@ -184,11 +195,11 @@ class _ResidentComplaintCreateScreenState
                     controller: _nameController,
                     maxLength: 255,
                     decoration: const InputDecoration(
-                      labelText: 'Complainant Full Name *',
-                      hintText: 'Enter complainant full name',
+                      labelText: 'Resident Name *',
+                      hintText: 'Enter resident full name',
                     ),
                     validator: (value) =>
-                        _required(value, 'Complainant Full Name'),
+                        _required(value, 'Resident Name'),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -214,19 +225,126 @@ class _ResidentComplaintCreateScreenState
                     },
                   ),
                   const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _feedbackCategory,
+                    decoration: const InputDecoration(
+                      labelText: 'What is this feedback about? *',
+                    ),
+                    items: const <DropdownMenuItem<String>>[
+                      DropdownMenuItem(
+                        value: 'system_experience',
+                        child: Text('TabangNow System Experience'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'staff_response',
+                        child: Text('Staff Response & Action'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'barangay_service',
+                        child: Text('Barangay Service'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'community_concern',
+                        child: Text('Community Concern'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'suggestion',
+                        child: Text('Suggestion / Improvement'),
+                      ),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() {
+                                _feedbackCategory = value;
+                              });
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _feedbackType,
+                    decoration: const InputDecoration(
+                      labelText: 'Feedback Type *',
+                    ),
+                    items: const <DropdownMenuItem<String>>[
+                      DropdownMenuItem(
+                        value: 'concern',
+                        child: Text('Concern'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'complaint',
+                        child: Text('Complaint'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'suggestion',
+                        child: Text('Suggestion'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'compliment',
+                        child: Text('Compliment'),
+                      ),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() {
+                                _feedbackType = value;
+                              });
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _subjectController,
+                    maxLength: 255,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Subject *',
+                      hintText: 'Short summary of your feedback',
+                    ),
+                    validator: (value) => _required(value, 'Subject'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int?>(
+                    initialValue: _serviceRating,
+                    decoration: const InputDecoration(
+                      labelText: 'Service / Experience Rating',
+                      helperText: 'Optional. Choose a rating when relevant.',
+                    ),
+                    items: const <DropdownMenuItem<int?>>[
+                      DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Not applicable / Prefer not to rate'),
+                      ),
+                      DropdownMenuItem<int?>(value: 5, child: Text('5 / 5')),
+                      DropdownMenuItem<int?>(value: 4, child: Text('4 / 5')),
+                      DropdownMenuItem<int?>(value: 3, child: Text('3 / 5')),
+                      DropdownMenuItem<int?>(value: 2, child: Text('2 / 5')),
+                      DropdownMenuItem<int?>(value: 1, child: Text('1 / 5')),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _serviceRating = value;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _addressController,
                     maxLength: 500,
                     minLines: 3,
                     maxLines: 5,
                     decoration: const InputDecoration(
-                      labelText: 'Address / Location of Complaint *',
+                      labelText: 'Location / Service Area',
                       hintText:
-                          'Example: Purok 2, near covered court, Dao, Capiz',
+                          'Optional. Add a location, office, service area, or place if relevant.',
                       alignLabelWithHint: true,
                     ),
-                    validator: (value) =>
-                        _required(value, 'Address / Location'),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -235,18 +353,19 @@ class _ResidentComplaintCreateScreenState
                     minLines: 6,
                     maxLines: 10,
                     decoration: const InputDecoration(
-                      labelText: 'Complaint Description *',
-                      hintText: 'Describe the complaint clearly.',
+                      labelText: 'Feedback Details *',
+                      hintText:
+                          'Describe what happened, what worked well or poorly, how staff responded, what action was taken, or what you suggest should improve.',
                       alignLabelWithHint: true,
                     ),
                     validator: (value) =>
-                        _required(value, 'Complaint Description'),
+                        _required(value, 'Feedback Details'),
                   ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Evidence Picture',
+                      'Supporting Picture',
                       style: TextStyle(
                         color: palette.textMain,
                         fontWeight: FontWeight.w800,
@@ -272,8 +391,8 @@ class _ResidentComplaintCreateScreenState
                             icon: const Icon(Icons.camera_alt_outlined),
                             label: Text(
                               _evidence == null
-                                  ? 'Take Evidence Photo'
-                                  : 'Retake Evidence Photo',
+                                  ? 'Take Supporting Photo'
+                                  : 'Retake Supporting Photo',
                             ),
                           ),
                         ),
@@ -342,7 +461,7 @@ class _ResidentComplaintCreateScreenState
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Submit Complaint'),
+                              : const Text('Send Feedback'),
                         ),
                       ),
                     ],

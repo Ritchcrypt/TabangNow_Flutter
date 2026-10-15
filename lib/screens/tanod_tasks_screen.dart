@@ -30,6 +30,7 @@ class _TanodTasksScreenState extends State<TanodTasksScreen> {
   List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
   Map<String, dynamic> _summary = <String, dynamic>{};
   Map<String, dynamic> _permissions = <String, dynamic>{};
+  List<Map<String, dynamic>> _barangayOptions = <Map<String, dynamic>>[];
 
   int _currentPage = 1;
   int _lastPage = 1;
@@ -86,6 +87,8 @@ class _TanodTasksScreenState extends State<TanodTasksScreen> {
 
       final incoming = _mapList(response['data']);
       final pagination = _map(response['pagination']);
+      final options = _map(response['options']);
+      final barangays = _mapList(options['barangays']);
 
       setState(() {
         _items = append
@@ -93,6 +96,9 @@ class _TanodTasksScreenState extends State<TanodTasksScreen> {
             : incoming;
         _summary = _map(response['summary']);
         _permissions = _map(response['permissions']);
+        if (barangays.isNotEmpty) {
+          _barangayOptions = barangays;
+        }
         _currentPage = _toInt(pagination['current_page']) ?? page;
         _lastPage = _toInt(pagination['last_page']) ?? 1;
         _loading = false;
@@ -133,6 +139,7 @@ class _TanodTasksScreenState extends State<TanodTasksScreen> {
       builder: (_) => _CreateTaskSheet(
         service: _service,
         activeTanodCount: _toInt(_summary['active_tanod_count']) ?? 0,
+        barangayOptions: _barangayOptions,
       ),
     );
 
@@ -465,6 +472,28 @@ class _AdminTaskCard extends StatelessWidget {
               ),
             ),
           ],
+          if (_nullableText(task['barangay_name']) != null) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              'Response Barangay: ${task['barangay_name']}',
+              style: TextStyle(
+                color: palette.textSoft,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+          if (task['fallback_used'] == true) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              'Fallback routing used because no active tanod was available in the selected barangay.',
+              style: TextStyle(
+                color: palette.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           Wrap(
             spacing: 8,
@@ -579,6 +608,17 @@ class _TanodTaskCard extends StatelessWidget {
               height: 1.5,
             ),
           ),
+          if (_nullableText(task['barangay_name']) != null) ...<Widget>[
+            const SizedBox(height: 10),
+            Text(
+              'Response Barangay: ${task['barangay_name']}',
+              style: TextStyle(
+                color: palette.textSoft,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           _ScheduleBlock(task: task),
           if (_nullableText(response['responded_at']) != null) ...<Widget>[
@@ -660,10 +700,12 @@ class _CreateTaskSheet extends StatefulWidget {
   const _CreateTaskSheet({
     required this.service,
     required this.activeTanodCount,
+    required this.barangayOptions,
   });
 
   final TanodTaskService service;
   final int activeTanodCount;
+  final List<Map<String, dynamic>> barangayOptions;
 
   @override
   State<_CreateTaskSheet> createState() => _CreateTaskSheetState();
@@ -676,6 +718,7 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
   final TextEditingController _location = TextEditingController();
 
   String _priority = 'normal';
+  int? _barangayId;
   DateTime? _taskDateTime;
   DateTime? _dueAt;
   bool _busy = false;
@@ -720,6 +763,15 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
       return;
     }
 
+    if (_barangayId == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Response barangay is required.')),
+        );
+      return;
+    }
+
     if (_taskDateTime != null &&
         _dueAt != null &&
         _dueAt!.isBefore(_taskDateTime!)) {
@@ -744,6 +796,7 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
         title: _title.text,
         description: _description.text,
         location: _location.text,
+        barangayId: _barangayId!,
         taskDateTime: _taskDateTime,
         dueAt: _dueAt,
         priority: _priority,
@@ -805,7 +858,7 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                'This task will be assigned to all active tanods. Each tanod can accept or decline it.',
+                'Tanods assigned to the selected barangay receive this task first. If none are available, active tanods from other Dao barangays are used as fallback.',
                 style: TextStyle(color: palette.textMuted, fontSize: 12),
               ),
               const SizedBox(height: 16),
@@ -830,11 +883,50 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
                 ),
               ),
               const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: _barangayId,
+                decoration: const InputDecoration(
+                  labelText: 'Response Barangay *',
+                  helperText:
+                      'Tanods assigned to this barangay are offered the task first.',
+                ),
+                items: widget.barangayOptions
+                    .map(
+                      (row) {
+                        final id = _toInt(row['value'] ?? row['id']);
+                        final label =
+                            row['label']?.toString().trim().isNotEmpty == true
+                            ? row['label'].toString().trim()
+                            : row['barangay_name']?.toString().trim() ?? '';
+
+                        if (id == null || label.isEmpty) {
+                          return null;
+                        }
+
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text(label),
+                        );
+                      },
+                    )
+                    .whereType<DropdownMenuItem<int>>()
+                    .toList(),
+                onChanged: _busy
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _barangayId = value;
+                        });
+                      },
+                validator: (value) =>
+                    value == null ? 'Response barangay is required.' : null,
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _location,
                 decoration: const InputDecoration(
                   labelText: 'Location',
-                  hintText: 'Barangay, street, or landmark',
+                  hintText: 'Street, sitio, landmark, or exact area',
                 ),
               ),
               const SizedBox(height: 12),
@@ -908,7 +1000,8 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Active tanods who will receive this task: ${widget.activeTanodCount}',
+                  'Active tanods across Dao: ${widget.activeTanodCount}. '
+                  'Routing starts with the selected barangay before fallback.',
                   style: TextStyle(
                     color: palette.accentText,
                     fontSize: 12,
@@ -1107,6 +1200,28 @@ class _AdminTaskDetailSheetState extends State<_AdminTaskDetailSheet> {
                     height: 1.5,
                   ),
                 ),
+                if (_nullableText(_task['barangay_name']) != null) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Response Barangay: ${_task['barangay_name']}',
+                    style: TextStyle(
+                      color: palette.textSoft,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+                if (_task['fallback_used'] == true) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Fallback routing was used for this task.',
+                    style: TextStyle(
+                      color: palette.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Wrap(
                   spacing: 9,

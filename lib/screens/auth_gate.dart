@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/global_theme_controller.dart';
+
 import '../services/auth_service.dart';
 import '../widgets/sos_flip_coin_button.dart';
 import 'forgot_password_screen.dart';
@@ -39,6 +41,13 @@ class _AuthGateState extends State<AuthGate> {
     super.dispose();
   }
 
+  void _applyUserTheme(Map<String, dynamic> user) {
+    TabangNowThemeController.apply(
+      mode: user['theme_mode']?.toString() ?? 'system',
+      customColor: user['theme_custom_color']?.toString(),
+    );
+  }
+
   Future<void> _restoreSession() async {
     try {
       final token = await _authService.getToken();
@@ -58,8 +67,12 @@ class _AuthGateState extends State<AuthGate> {
       }
 
       if (rawUser is Map) {
+        final user = Map<String, dynamic>.from(rawUser);
+
+        _applyUserTheme(user);
+
         setState(() {
-          _user = Map<String, dynamic>.from(rawUser);
+          _user = user;
           _checkingSession = false;
         });
         return;
@@ -104,8 +117,12 @@ class _AuthGateState extends State<AuthGate> {
         return;
       }
 
+      final user = Map<String, dynamic>.from(rawUser);
+
+      _applyUserTheme(user);
+
       setState(() {
-        _user = Map<String, dynamic>.from(rawUser);
+        _user = user;
         _loggingIn = false;
       });
     } on AuthException catch (exception) {

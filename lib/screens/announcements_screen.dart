@@ -32,6 +32,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   List<Map<String, dynamic>> _categories = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _priorities = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _audiences = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _barangays = <Map<String, dynamic>>[];
 
   int _currentPage = 1;
   int _lastPage = 1;
@@ -94,6 +95,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
         _audiences = _mapList(options['audiences']);
 
+        final optionBarangays = _mapList(options['barangays']);
+
+        if (optionBarangays.isNotEmpty) {
+          _barangays = optionBarangays;
+        }
+
         _currentPage = _int(pagination['current_page'], fallback: page);
 
         _lastPage = _int(pagination['last_page'], fallback: 1);
@@ -120,6 +127,37 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       return;
     }
 
+    var barangays = _barangays;
+
+    if (barangays.isEmpty) {
+      try {
+        barangays = await _service.barangayOptions();
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _barangays = barangays;
+        });
+      } catch (exception) {
+        if (mounted) {
+          _show(
+            exception.toString().replaceFirst('AuthException: ', ''),
+          );
+        }
+
+        return;
+      }
+    }
+
+    if (barangays.isEmpty) {
+      _show(
+        'No official Dao barangays are available for announcement targeting.',
+      );
+      return;
+    }
+
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(
         builder: (_) => AnnouncementCreateScreen(
@@ -127,6 +165,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           categories: _categories,
           priorities: _priorities,
           audiences: _audiences,
+          barangays: barangays,
         ),
       ),
     );

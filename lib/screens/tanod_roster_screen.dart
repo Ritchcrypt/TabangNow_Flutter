@@ -37,6 +37,8 @@ class _TanodRosterScreenState extends State<TanodRosterScreen> {
 
   List<Map<String, dynamic>> _statusOptions = <Map<String, dynamic>>[];
 
+  List<Map<String, dynamic>> _barangayOptions = <Map<String, dynamic>>[];
+
   int _currentPage = 1;
   int _lastPage = 1;
 
@@ -127,12 +129,18 @@ class _TanodRosterScreenState extends State<TanodRosterScreen> {
 
         final statuses = _mapList(options['statuses']);
 
+        final barangays = _mapList(options['barangays']);
+
         if (shifts.isNotEmpty) {
           _shiftOptions = shifts;
         }
 
         if (statuses.isNotEmpty) {
           _statusOptions = statuses;
+        }
+
+        if (barangays.isNotEmpty) {
+          _barangayOptions = barangays;
         }
 
         _currentPage = _toIntStatic(pagination['current_page']) ?? requestPage;
@@ -184,6 +192,7 @@ class _TanodRosterScreenState extends State<TanodRosterScreen> {
         service: _service,
         shiftOptions: _shiftOptions,
         statusOptions: _statusOptions,
+        barangayOptions: _barangayOptions,
       ),
     );
 
@@ -208,6 +217,7 @@ class _TanodRosterScreenState extends State<TanodRosterScreen> {
         service: _service,
         shiftOptions: _shiftOptions,
         statusOptions: _statusOptions,
+        barangayOptions: _barangayOptions,
         initial: tanod,
       ),
     );
@@ -497,7 +507,7 @@ class _SearchPanel extends StatelessWidget {
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => onSearch(),
             decoration: InputDecoration(
-              hintText: 'Name, contact, purok, shift, or status...',
+              hintText: 'Name, contact, barangay, shift, or status...',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: IconButton(
                 tooltip: 'Search',
@@ -548,7 +558,7 @@ class _TanodCard extends StatelessWidget {
 
     final contact = _display(tanod['contact_number']);
 
-    final purok = _display(tanod['purok_assignment']);
+    final assignedBarangay = _display(tanod['barangay_name']);
 
     final shift = tanod['shift_label']?.toString().trim().isNotEmpty == true
         ? tanod['shift_label'].toString().trim()
@@ -661,7 +671,10 @@ class _TanodCard extends StatelessWidget {
               spacing: 10,
               runSpacing: 10,
               children: <Widget>[
-                _InfoChip(label: 'Purok', value: purok),
+                _InfoChip(
+                  label: 'Assigned Barangay',
+                  value: assignedBarangay,
+                ),
                 _InfoChip(label: 'Shift', value: shift),
                 _InfoChip(label: 'Appointed', value: dateAppointed),
                 if (autoDutyEnabled)
@@ -867,12 +880,14 @@ class _TanodFormSheet extends StatefulWidget {
     required this.service,
     required this.shiftOptions,
     required this.statusOptions,
+    required this.barangayOptions,
     this.initial,
   });
 
   final TanodRosterService service;
   final List<Map<String, dynamic>> shiftOptions;
   final List<Map<String, dynamic>> statusOptions;
+  final List<Map<String, dynamic>> barangayOptions;
   final Map<String, dynamic>? initial;
 
   bool get editing => initial != null;
@@ -895,6 +910,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
   bool _autoDutyEnabled = false;
   late String _shift;
   late String _status;
+  int? _barangayId;
 
   @override
   void initState() {
@@ -937,6 +953,15 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
       widget.statusOptions,
       fallback: 'active',
     );
+
+    _barangayId = _toIntStatic(initial['barangay_id']);
+
+    if (_barangayId != null &&
+        !widget.barangayOptions.any(
+          (row) => _toIntStatic(row['value'] ?? row['id']) == _barangayId,
+        )) {
+      _barangayId = null;
+    }
 
     _autoDutyEnabled = initial['auto_duty_enabled'] == true;
   }
@@ -988,6 +1013,15 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
       return;
     }
 
+    if (_barangayId == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Assigned barangay is required.')),
+        );
+      return;
+    }
+
     setState(() {
       _busy = true;
     });
@@ -1009,6 +1043,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
           email: _emailController.text,
           purokAssignment: _purokController.text,
           dateAppointed: _dateController.text,
+          barangayId: _barangayId!,
           shift: _shift,
           status: _status,
           autoDutyEnabled: _autoDutyEnabled,
@@ -1021,6 +1056,7 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
           email: _emailController.text,
           purokAssignment: _purokController.text,
           dateAppointed: _dateController.text,
+          barangayId: _barangayId!,
           shift: _shift,
           status: _status,
           autoDutyEnabled: _autoDutyEnabled,
@@ -1143,12 +1179,43 @@ class _TanodFormSheetState extends State<_TanodFormSheet> {
               ),
               const SizedBox(height: 12),
 
-              TextFormField(
-                controller: _purokController,
+              DropdownButtonFormField<int>(
+                initialValue: _barangayId,
                 decoration: const InputDecoration(
-                  labelText: 'Purok Assignment',
-                  hintText: 'Purok 1',
+                  labelText: 'Assigned Barangay *',
+                  helperText:
+                      'Incident response tasks for this barangay are offered to its tanods first.',
                 ),
+                items: widget.barangayOptions
+                    .map(
+                      (row) {
+                        final id = _toIntStatic(row['value'] ?? row['id']);
+                        final label =
+                            row['label']?.toString().trim().isNotEmpty == true
+                            ? row['label'].toString().trim()
+                            : row['barangay_name']?.toString().trim() ?? '';
+
+                        if (id == null || label.isEmpty) {
+                          return null;
+                        }
+
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text(label),
+                        );
+                      },
+                    )
+                    .whereType<DropdownMenuItem<int>>()
+                    .toList(),
+                onChanged: _busy
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _barangayId = value;
+                        });
+                      },
+                validator: (value) =>
+                    value == null ? 'Assigned barangay is required.' : null,
               ),
               const SizedBox(height: 12),
 

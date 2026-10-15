@@ -22,9 +22,6 @@ enum AppCapability {
   manageTanodTasks,
   respondToTanodTasks,
 
-  viewCaseManagement,
-  manageCases,
-
   viewAnnouncements,
   manageAnnouncements,
 
@@ -99,9 +96,6 @@ class AppCapabilities {
           AppCapability.manageTanodRoster,
 
           AppCapability.manageTanodTasks,
-
-          AppCapability.viewCaseManagement,
-          AppCapability.manageCases,
 
           AppCapability.viewAnnouncements,
           AppCapability.manageAnnouncements,

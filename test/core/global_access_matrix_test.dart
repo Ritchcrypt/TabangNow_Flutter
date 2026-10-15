@@ -22,7 +22,6 @@ void main() {
           AppModuleId.tanodAlerts,
           AppModuleId.tanodRoster,
           AppModuleId.tanodTasks,
-          AppModuleId.caseManagement,
           AppModuleId.announcements,
           AppModuleId.emergencyHotlines,
           AppModuleId.residentComplaints,
@@ -47,7 +46,6 @@ void main() {
 
       expect(modules, isNot(contains(AppModuleId.tanodAlerts)));
       expect(modules, isNot(contains(AppModuleId.tanodTasks)));
-      expect(modules, isNot(contains(AppModuleId.caseManagement)));
       expect(modules, isNot(contains(AppModuleId.reports)));
       expect(modules, isNot(contains(AppModuleId.userManagement)));
       expect(modules, isNot(contains(AppModuleId.activityLogs)));
@@ -71,7 +69,6 @@ void main() {
       expect(modules, isNot(contains(AppModuleId.tanodRoster)));
       expect(modules, isNot(contains(AppModuleId.residentComplaints)));
       expect(modules, isNot(contains(AppModuleId.barangayMap)));
-      expect(modules, isNot(contains(AppModuleId.caseManagement)));
       expect(modules, isNot(contains(AppModuleId.userManagement)));
     });
 

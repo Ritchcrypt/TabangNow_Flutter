@@ -9,7 +9,6 @@ enum AppModuleId {
   tanodAlerts,
   tanodRoster,
   tanodTasks,
-  caseManagement,
   announcements,
   emergencyHotlines,
   residentComplaints,
@@ -59,7 +58,7 @@ class AppModuleDefinition {
 
       case AppModuleId.residentComplaints:
         if (role == AppRole.resident) {
-          return 'Complaints Form';
+          return 'Resident Feedback';
         }
 
         return defaultLabel;

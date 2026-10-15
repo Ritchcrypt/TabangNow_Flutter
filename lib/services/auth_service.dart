@@ -190,7 +190,6 @@ class AuthService {
     );
   }
 
-
   Future<void> presenceHeartbeat() async {
     final token = await getToken();
 
@@ -209,10 +208,14 @@ class AuthService {
           )
           .timeout(_requestTimeout);
     } on TimeoutException {
+      // Presence heartbeat is best-effort; ignore transient timeouts.
     } on SocketException {
+      // Presence heartbeat is best-effort; ignore temporary network loss.
     } on http.ClientException {
+      // Presence heartbeat is best-effort; ignore transient client failures.
     }
   }
+
   Future<Map<String, dynamic>> dashboard() {
     return _authorizedGet('/api/v1/dashboard');
   }

@@ -24,50 +24,92 @@ class ReportService {
   final AuthService authService;
   final http.Client _client;
 
-  Future<Map<String, dynamic>> index({required String period}) async {
-    final uri = Uri.parse(
-      '$baseUrl/api/v1/reports',
-    ).replace(queryParameters: <String, String>{'period': period});
+  Future<Map<String, dynamic>> index({
+    required String period,
+    required String metric,
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/reports').replace(
+      queryParameters: _query(
+        period: period,
+        metric: metric,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      ),
+    );
 
     final response = await _client.get(uri, headers: await _headers());
 
     return _jsonResponse(response);
   }
 
-  Future<DownloadedReportPdf> periodPdf({required String period}) {
-    final uri = Uri.parse(
-      '$baseUrl/api/v1/reports/pdf',
-    ).replace(queryParameters: <String, String>{'period': period});
+  Future<DownloadedReportPdf> metricPdf({
+    required String period,
+    required String metric,
+    String? dateFrom,
+    String? dateTo,
+  }) {
+    final uri = Uri.parse('$baseUrl/api/v1/reports/pdf').replace(
+      queryParameters: _query(
+        period: period,
+        metric: metric,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      ),
+    );
 
-    return _pdfRequest(uri, fallbackFileName: 'barangay-report-$period.pdf');
-  }
-
-  Future<DownloadedReportPdf> incidentPdf(int incidentId) {
     return _pdfRequest(
-      Uri.parse('$baseUrl/api/v1/reports/incidents/$incidentId/pdf'),
-      fallbackFileName: 'incident-report-$incidentId.pdf',
+      uri,
+      fallbackFileName: 'tabangnow-$metric-report.pdf',
     );
   }
 
-  Future<DownloadedReportPdf> casePdf(int caseId) {
-    return _pdfRequest(
-      Uri.parse('$baseUrl/api/v1/reports/cases/$caseId/pdf'),
-      fallbackFileName: 'case-report-$caseId.pdf',
+  Future<DownloadedReportPdf> selectedPdf({
+    required String period,
+    required String metric,
+    required String selectionMode,
+    required List<String> recordKeys,
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/reports/selection/pdf');
+    final headers = await _headers();
+
+    final response = await _client.post(
+      uri,
+      headers: <String, String>{
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(<String, dynamic>{
+        'period': period,
+        'metric': metric,
+        'selection_mode': selectionMode,
+        'records': recordKeys,
+        if (period == 'custom' && dateFrom != null) 'date_from': dateFrom,
+        if (period == 'custom' && dateTo != null) 'date_to': dateTo,
+      }),
+    );
+
+    return _pdfResponse(
+      response,
+      fallbackFileName: 'tabangnow-$metric-selected-report.pdf',
     );
   }
 
-  Future<DownloadedReportPdf> complaintPdf(int complaintId) {
-    return _pdfRequest(
-      Uri.parse('$baseUrl/api/v1/reports/complaints/$complaintId/pdf'),
-      fallbackFileName: 'complaint-report-$complaintId.pdf',
-    );
-  }
-
-  Future<DownloadedReportPdf> sosPdf(int alertId) {
-    return _pdfRequest(
-      Uri.parse('$baseUrl/api/v1/reports/sos/$alertId/pdf'),
-      fallbackFileName: 'sos-report-$alertId.pdf',
-    );
+  Map<String, String> _query({
+    required String period,
+    required String metric,
+    String? dateFrom,
+    String? dateTo,
+  }) {
+    return <String, String>{
+      'period': period,
+      'metric': metric,
+      if (period == 'custom' && dateFrom != null) 'date_from': dateFrom,
+      if (period == 'custom' && dateTo != null) 'date_to': dateTo,
+    };
   }
 
   Future<DownloadedReportPdf> _pdfRequest(
@@ -76,6 +118,13 @@ class ReportService {
   }) async {
     final response = await _client.get(uri, headers: await _headers());
 
+    return _pdfResponse(response, fallbackFileName: fallbackFileName);
+  }
+
+  Future<DownloadedReportPdf> _pdfResponse(
+    http.Response response, {
+    required String fallbackFileName,
+  }) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final contentType = response.headers['content-type']?.toLowerCase() ?? '';
 
@@ -144,6 +193,7 @@ class ReportService {
         return Map<String, dynamic>.from(decoded);
       }
     } catch (_) {
+      // The API may return a non-JSON error page. Fall through to a generic message.
     }
 
     return <String, dynamic>{};

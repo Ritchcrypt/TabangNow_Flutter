@@ -68,7 +68,7 @@ void main() {
     },
   );
 
-  test('Resident Complaints includes secure website workflows', () {
+  test('Resident Feedback includes secure website workflows', () {
     final service = File(
       'lib/services/resident_complaint_service.dart',
     ).readAsStringSync();
@@ -98,34 +98,37 @@ void main() {
     }
 
     for (final marker in <String>[
-      'My Complaints',
-      'Resident Complaints',
-      'Submit Complaint',
-      'View complaint',
+      'My Feedback',
+      'Resident Feedback',
+      'Send Feedback',
+      'View feedback',
       'Load More',
     ]) {
       expect(list, contains(marker));
     }
 
     for (final marker in <String>[
-      'Complainant Full Name *',
+      'Resident Name *',
       'Contact Number',
-      'Address / Location of Complaint *',
-      'Complaint Description *',
-      'Evidence Picture',
+      'What is this feedback about? *',
+      'Feedback Type *',
+      'Service / Experience Rating',
+      'Location / Service Area',
+      'Feedback Details *',
+      'Supporting Picture',
       '10MB',
     ]) {
       expect(create, contains(marker));
     }
 
     for (final marker in <String>[
-      'Complaint Information',
+      'Feedback Information',
       'Resident Submitted Evidence',
       'Admin / Official Action Proof',
       'Send Action Proof Picture to Resident',
       'Update Status',
       'Save Status',
-      'Delete Complaint',
+      'Delete Feedback',
     ]) {
       expect(detail, contains(marker));
     }

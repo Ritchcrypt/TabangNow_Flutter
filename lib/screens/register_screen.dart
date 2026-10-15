@@ -18,12 +18,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _contactController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmationController = TextEditingController();
 
   bool _submitting = false;
+  bool _ageConfirmed = false;
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
+  List<Map<String, dynamic>> _barangays = <Map<String, dynamic>>[];
+
+  int? _selectedBarangayId;
+
+  bool _loadingBarangays = true;
+
+  String? _barangayError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBarangays();
+  }
+
+  Future<void> _loadBarangays() async {
+    if (mounted) {
+      setState(() {
+        _loadingBarangays = true;
+        _barangayError = null;
+      });
+    }
+
+    try {
+      final barangays = await _registrationService.fetchBarangays();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _barangays = barangays;
+
+        if (_selectedBarangayId != null &&
+            !_barangays.any(
+              (barangay) => _nullableInt(barangay['id']) == _selectedBarangayId,
+            )) {
+          _selectedBarangayId = null;
+        }
+
+        _loadingBarangays = false;
+      });
+    } on RegistrationException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _loadingBarangays = false;
+        _barangayError = exception.userMessage;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _loadingBarangays = false;
+        _barangayError = 'Unable to load barangays right now.';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -31,6 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _contactController.dispose();
     _addressController.dispose();
+    _dateOfBirthController.dispose();
     _passwordController.dispose();
     _confirmationController.dispose();
     super.dispose();
@@ -38,6 +102,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (_submitting || !(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    if (!_ageConfirmed) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Confirm that your date of birth is accurate and that you are at least 18 years old.',
+            ),
+          ),
+        );
       return;
     }
 
@@ -49,6 +126,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text,
         contactNumber: _contactController.text,
         address: _addressController.text,
+        barangayId: _selectedBarangayId!,
+        dateOfBirth: _dateOfBirthController.text,
+        ageConfirmation: _ageConfirmed,
         password: _passwordController.text,
         passwordConfirmation: _confirmationController.text,
       );
@@ -112,12 +192,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  DateTime get _latestEligibleBirthDate {
+    final today = DateTime.now();
+    return DateTime(today.year - 18, today.month, today.day);
+  }
+
+  DateTime get _earliestEligibleBirthDate {
+    final today = DateTime.now();
+    return DateTime(today.year - 120, today.month, today.day);
+  }
+
+  String _formatDate(DateTime value) {
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+    return '${value.year}-$month-$day';
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final current = DateTime.tryParse(_dateOfBirthController.text);
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: current ?? _latestEligibleBirthDate,
+      firstDate: _earliestEligibleBirthDate,
+      lastDate: _latestEligibleBirthDate,
+      helpText: 'Resident date of birth',
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _dateOfBirthController.text = _formatDate(selected);
+    });
+  }
+
+  ThemeData _registrationLightTheme(BuildContext context) {
+    final inherited = Theme.of(context);
+
+    final scheme = ColorScheme.fromSeed(
+      seedColor: inherited.colorScheme.primary,
+      brightness: Brightness.light,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: Colors.white,
+    );
+  }
+
   InputDecoration _fieldDecoration({
     required String hint,
     required IconData icon,
     Widget? suffixIcon,
   }) {
-    final theme = Theme.of(context);
+    final theme = _registrationLightTheme(context);
+    // TABANGNOW_SIGNUP_FIELD_LIGHT
 
     return InputDecoration(
       hintText: hint,
@@ -152,7 +284,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = _registrationLightTheme(context);
+    // TABANGNOW_SIGNUP_LIGHT_BUILD
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -160,6 +293,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         title: const Text('Create account'),
         backgroundColor: theme.colorScheme.surface,
         surfaceTintColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
       ),
       body: SafeArea(
@@ -171,7 +305,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               constraints: const BoxConstraints(maxWidth: 560),
               child: Column(
                 children: <Widget>[
-                  const PublicAuthBrandingHeader(logoSize: 78),
+                  // TABANGNOW_SIGNUP_BRANDING_LIGHT
+                  Theme(
+                    data: theme,
+                    child: const PublicAuthBrandingHeader(logoSize: 78),
+                  ),
                   const SizedBox(height: 26),
                   Container(
                     width: double.infinity,
@@ -217,7 +355,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           TextFormField(
                             controller: _nameController,
                             textCapitalization: TextCapitalization.words,
-                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: _fieldDecoration(
                               hint: 'Full name',
                               icon: Icons.person_outline_rounded,
@@ -232,7 +372,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             autofillHints: const <String>[AutofillHints.email],
-                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: _fieldDecoration(
                               hint: 'Email address',
                               icon: Icons.email_outlined,
@@ -257,7 +399,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             autofillHints: const <String>[
                               AutofillHints.telephoneNumber,
                             ],
-                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: _fieldDecoration(
                               hint: '09XXXXXXXXX',
                               icon: Icons.phone_outlined,
@@ -281,7 +425,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             minLines: 2,
                             maxLines: 4,
                             textCapitalization: TextCapitalization.words,
-                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: _fieldDecoration(
                               hint: 'Complete address',
                               icon: Icons.location_on_outlined,
@@ -292,13 +438,191 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 : null,
                           ),
                           const SizedBox(height: 14),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.22,
+                                ),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Resident age requirement',
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Resident registration is limited to persons 18 years old or older. Your information remains subject to administrator review before activation.',
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _dateOfBirthController,
+                                  readOnly: true,
+                                  onTap: _submitting ? null : _pickDateOfBirth,
+                                  decoration: _fieldDecoration(
+                                    hint: 'Date of birth',
+                                    icon: Icons.cake_outlined,
+                                    suffixIcon: const Icon(
+                                      Icons.calendar_month_outlined,
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    final text = value?.trim() ?? '';
+                                    if (text.isEmpty) {
+                                      return 'Select your date of birth.';
+                                    }
+
+                                    final parsed = DateTime.tryParse(text);
+                                    if (parsed == null) {
+                                      return 'Enter a valid date of birth.';
+                                    }
+
+                                    if (parsed.isAfter(
+                                      _latestEligibleBirthDate,
+                                    )) {
+                                      return 'Resident registration is limited to persons 18 years old or older.';
+                                    }
+
+                                    if (parsed.isBefore(
+                                      _earliestEligibleBirthDate,
+                                    )) {
+                                      return 'Enter a plausible date of birth.';
+                                    }
+
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 10),
+                                CheckboxListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  value: _ageConfirmed,
+                                  onChanged: _submitting
+                                      ? null
+                                      : (value) {
+                                          setState(() {
+                                            _ageConfirmed = value ?? false;
+                                          });
+                                        },
+                                  title: Text(
+                                    'I certify that the date of birth I entered is accurate and that I am at least 18 years old.',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onSurface,
+                                      fontSize: 13,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<int>(
+                            initialValue: _selectedBarangayId,
+                            isExpanded: true,
+                            dropdownColor: theme.colorScheme.surface,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            decoration: _fieldDecoration(
+                              hint: 'Barangay of residence',
+                              icon: Icons.location_city_outlined,
+                            ).copyWith(labelText: 'Barangay of residence'),
+                            items: _barangays
+                                .map((barangay) {
+                                  final id = _nullableInt(barangay['id']);
+
+                                  if (id == null) {
+                                    return null;
+                                  }
+
+                                  final name =
+                                      barangay['name']?.toString().trim() ?? '';
+
+                                  return DropdownMenuItem<int>(
+                                    value: id,
+                                    child: Text(
+                                      name.isEmpty ? 'Barangay #$id' : name,
+                                    ),
+                                  );
+                                })
+                                .whereType<DropdownMenuItem<int>>()
+                                .toList(growable: false),
+                            onChanged: _submitting || _loadingBarangays
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      _selectedBarangayId = value;
+                                    });
+                                  },
+                            validator: (value) {
+                              if (_loadingBarangays) {
+                                return 'Barangays are still loading.';
+                              }
+
+                              if (value == null) {
+                                return 'Select the barangay where you live.';
+                              }
+
+                              return null;
+                            },
+                          ),
+                          if (_loadingBarangays) ...<Widget>[
+                            const SizedBox(height: 8),
+                            LinearProgressIndicator(
+                              color: theme.colorScheme.primary,
+                              backgroundColor:
+                                  theme.colorScheme.surfaceContainerHighest,
+                            ),
+                          ],
+                          if (_barangayError != null) ...<Widget>[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Text(
+                                    _barangayError!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFB91C1C),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _loadBarangays,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 14),
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             autofillHints: const <String>[
                               AutofillHints.newPassword,
                             ],
-                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: _fieldDecoration(
                               hint: 'Password',
                               icon: Icons.lock_outline_rounded,
@@ -332,7 +656,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             autofillHints: const <String>[
                               AutofillHints.newPassword,
                             ],
-                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: _fieldDecoration(
                               hint: 'Confirm password',
                               icon: Icons.lock_reset_rounded,
@@ -407,4 +733,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+}
+
+int? _nullableInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+
+  return int.tryParse(value?.toString() ?? '');
 }

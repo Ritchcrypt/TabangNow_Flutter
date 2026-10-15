@@ -21,7 +21,6 @@ void main() {
       "title: 'Reporter Information'",
       "title: 'Record Info'",
       "title: 'Related Cases'",
-      "label: const Text('Create Case')",
       "title: 'Update Incident'",
       "labelText: 'Status'",
       "child: const Text('Save Update')",
@@ -79,20 +78,31 @@ void main() {
     expect(source, isNot(contains('remarks:')));
   });
 
-  test('admin Related Cases can create a prelinked Case', () {
+  test('Related Cases stays read-only after Case Management retirement', () {
     final detail = File(
       'lib/screens/incident_detail_screen.dart',
     ).readAsStringSync();
-    final caseForm = File(
-      'lib/screens/case_form_screen.dart',
-    ).readAsStringSync();
 
-    expect(detail, contains("label: const Text('Create Case')"));
-    expect(detail, contains('initialIncidentId: widget.incidentId'));
-    expect(caseForm, contains('final int? initialIncidentId;'));
-    expect(caseForm, contains('widget.initialIncidentId'));
+    expect(detail, contains("title: 'Related Cases'"));
+    expect(detail, contains('onCreateCase: null'));
+
+    expect(detail, isNot(contains('CaseManagementService')));
+    expect(detail, isNot(contains('CaseFormScreen')));
+    expect(detail, isNot(contains('_createRelatedCase')));
+    expect(detail, isNot(contains('initialIncidentId: widget.incidentId')));
+
+    expect(File('lib/screens/case_form_screen.dart').existsSync(), isFalse);
+
+    expect(
+      File('lib/screens/case_management_screen.dart').existsSync(),
+      isFalse,
+    );
+
+    expect(
+      File('lib/services/case_management_service.dart').existsSync(),
+      isFalse,
+    );
   });
-
   test('Incident list keeps website controls and numeric ID display', () {
     final source = File('lib/screens/incidents_screen.dart').readAsStringSync();
 

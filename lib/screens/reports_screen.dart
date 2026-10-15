@@ -29,18 +29,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   bool _loading = true;
   bool _pdfBusy = false;
-  bool _showAllRecords = false;
   String? _error;
-
   String _period = 'week';
-
+  String _metric = 'total';
+  DateTimeRange? _customRange;
   Map<String, dynamic> _data = <String, dynamic>{};
 
   List<Map<String, dynamic>> _periodOptions = <Map<String, dynamic>>[
     <String, dynamic>{'value': 'today', 'label': 'Today'},
-    <String, dynamic>{'value': 'week', 'label': 'This Week'},
-    <String, dynamic>{'value': 'month', 'label': 'This Month'},
+    <String, dynamic>{'value': 'week', 'label': 'Last 7 Days'},
+    <String, dynamic>{'value': 'month', 'label': 'Last 30 Days'},
     <String, dynamic>{'value': 'year', 'label': 'This Year'},
+    <String, dynamic>{'value': 'custom', 'label': 'Custom / Previous Dates'},
   ];
 
   AppRole get _role => AppRoleX.fromRaw(
@@ -51,12 +51,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   bool get _canViewReports => _capabilities.allows(AppCapability.viewReports);
 
+  String? get _dateFrom =>
+      _customRange == null ? null : _dateString(_customRange!.start);
+
+  String? get _dateTo =>
+      _customRange == null ? null : _dateString(_customRange!.end);
+
   @override
   void initState() {
     super.initState();
-
     _service = ReportService(authService: widget.authService);
-
     _load();
   }
 
@@ -75,27 +79,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
     });
 
     try {
-      final response = await _service.index(period: _period);
+      final response = await _service.index(
+        period: _period,
+        metric: _metric,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      );
 
       if (!mounted) {
         return;
       }
 
       final data = _map(response['data']);
-
       final options = _mapList(response['period_options']);
-
       final serverPeriod = _text(data['period'], _period);
+      final serverMetric = _text(data['selected_metric'], _metric);
+
+      if (serverPeriod == 'custom') {
+        final from = _tryDate(data['date_from']);
+        final to = _tryDate(data['date_to']);
+
+        if (from != null && to != null) {
+          _customRange = DateTimeRange(start: from, end: to);
+        }
+      }
 
       setState(() {
         _data = data;
-
         if (options.isNotEmpty) {
           _periodOptions = options;
         }
-
         _period = serverPeriod;
-        _showAllRecords = false;
+        _metric = serverMetric;
         _loading = false;
         _error = null;
       });
@@ -116,52 +131,213 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return;
     }
 
+    if (value == 'custom') {
+      final now = DateTime.now();
+      final initial =
+          _customRange ??
+          DateTimeRange(start: now.subtract(const Duration(days: 6)), end: now);
+
+      final picked = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(now.year - 10, 1, 1),
+        lastDate: DateTime(now.year, now.month, now.day),
+        initialDateRange: initial,
+        helpText: 'Select previous report dates',
+        saveText: 'APPLY',
+      );
+
+      if (picked == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _period = 'custom';
+        _customRange = picked;
+      });
+
+      await _load();
+      return;
+    }
+
     setState(() {
       _period = value;
+      _customRange = null;
     });
 
     await _load();
   }
 
-  Future<void> _downloadPeriodPdf() async {
-    await _generatePdf(() => _service.periodPdf(period: _period));
+  Future<void> _selectMetric(String metric) async {
+    if (_loading || metric == _metric) {
+      return;
+    }
+
+    setState(() {
+      _metric = metric;
+    });
+
+    await _load();
   }
 
-  Future<void> _selectSpecificPdf(_SpecificReportKind kind) async {
-    final reportOptions = _map(_data['report_options']);
+  Future<void> _downloadMetricPdf([String? metric]) async {
+    final targetMetric = metric ?? _metric;
 
-    final options = switch (kind) {
-      _SpecificReportKind.incident => _mapList(reportOptions['incidents']),
-      _SpecificReportKind.caseRecord => _mapList(reportOptions['cases']),
-      _SpecificReportKind.complaint => _mapList(reportOptions['complaints']),
-      _SpecificReportKind.sos => _mapList(reportOptions['sos']),
-    };
+    await _generatePdf(
+      () => _service.metricPdf(
+        period: _period,
+        metric: targetMetric,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
+    );
+  }
 
-    if (options.isEmpty) {
+  Future<void> _selectRecordsPdf() async {
+    final records = _mapList(_data['records']);
+
+    if (records.isEmpty) {
+      _show('There are no records to download for this metric and timeline.');
+      return;
+    }
+
+    final selectable = records
+        .where((record) => _text(record['record_key']).isNotEmpty)
+        .toList(growable: false);
+
+    if (selectable.length != records.length) {
       _show(
-        'No ${kind.pluralLabel.toLowerCase()} are available for PDF generation.',
+        'The API did not provide selection keys for every record. Refresh Reports after the Laravel Patch 05A API update.',
       );
       return;
     }
 
-    final selectedId = await showModalBottomSheet<int>(
+    final selected = <String>{};
+
+    final choice = await showModalBottomSheet<_PdfSelection>(
       context: context,
       isScrollControlled: true,
       backgroundColor: TabangNowTheme.of(context).surface,
-      builder: (_) => _SpecificReportPicker(kind: kind, options: options),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final palette = TabangNowTheme.of(context);
+
+            return SafeArea(
+              child: FractionallySizedBox(
+                heightFactor: 0.86,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Select Records for PDF',
+                        style: TextStyle(
+                          color: palette.textMain,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_selectedMetricLabel()} · ${_periodLabel()}',
+                        style: TextStyle(color: palette.textMuted),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ListView.separated(
+                          itemCount: selectable.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final record = selectable[index];
+                            final key = _text(record['record_key']);
+                            final checked = selected.contains(key);
+
+                            return CheckboxListTile(
+                              value: checked,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                _text(record['title'], 'Untitled record'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                '${_text(record['category'], 'Record')} · ${_text(record['datetime'], '—')}',
+                              ),
+                              onChanged: (value) {
+                                setSheetState(() {
+                                  if (value == true) {
+                                    selected.add(key);
+                                  } else {
+                                    selected.remove(key);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.of(sheetContext).pop(
+                                  const _PdfSelection(
+                                    all: true,
+                                    keys: <String>[],
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.select_all_rounded),
+                              label: const Text('Download All'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: selected.isEmpty
+                                  ? null
+                                  : () {
+                                      Navigator.of(sheetContext).pop(
+                                        _PdfSelection(
+                                          all: false,
+                                          keys: selected.toList(
+                                            growable: false,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              icon: const Icon(Icons.download_rounded),
+                              label: Text('Selected (${selected.length})'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
 
-    if (selectedId == null || !mounted) {
+    if (choice == null || !mounted) {
       return;
     }
 
     await _generatePdf(
-      () => switch (kind) {
-        _SpecificReportKind.incident => _service.incidentPdf(selectedId),
-        _SpecificReportKind.caseRecord => _service.casePdf(selectedId),
-        _SpecificReportKind.complaint => _service.complaintPdf(selectedId),
-        _SpecificReportKind.sos => _service.sosPdf(selectedId),
-      },
+      () => _service.selectedPdf(
+        period: _period,
+        metric: _metric,
+        selectionMode: choice.all ? 'all' : 'selected',
+        recordKeys: choice.keys,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
     );
   }
 
@@ -178,7 +354,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     try {
       final pdf = await generate();
-
       final savedFile = await _savePdfCopy(pdf);
 
       if (!mounted) {
@@ -213,7 +388,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<File> _savePdfCopy(DownloadedReportPdf pdf) async {
     final documents = await getApplicationDocumentsDirectory();
-
     final reportDirectory = Directory(
       '${documents.path}${Platform.pathSeparator}TabangNow Reports',
     );
@@ -251,14 +425,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
 
     final summary = _map(_data['summary']);
-
     final records = _mapList(_data['records']);
-
-    final tanodSummary = _mapList(_data['tanod_summary']);
-
-    final visibleRecords = _showAllRecords
-        ? records
-        : records.take(5).toList(growable: false);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -266,36 +433,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
         children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+          // REPORTS_RESPONSIVE_HEADER_V1
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+
+              final heading = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Reports',
+                    style: TextStyle(
+                      color: palette.textMain,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Dao, Capiz — ${_periodLabel()}',
+                    style: TextStyle(color: palette.textMuted),
+                  ),
+                  if (_period == 'custom' && _customRange != null) ...<Widget>[
+                    const SizedBox(height: 3),
                     Text(
-                      'Reports',
+                      '${_dateFrom ?? ''} to ${_dateTo ?? ''}',
                       style: TextStyle(
-                        color: palette.textMain,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
+                        color: palette.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'Dao, Capiz — ${_text(_data['period_label'], 'This Week')}',
-                      style: TextStyle(color: palette.textMuted),
-                    ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 145,
+                ],
+              );
+
+              final timeline = SizedBox(
+                width: compact ? double.infinity : 170,
                 child: DropdownButtonFormField<String>(
                   initialValue: _period,
                   decoration: const InputDecoration(
-                    labelText: 'Period',
+                    labelText: 'Timeline',
                     isDense: true,
                   ),
                   items: _periodOptions
@@ -306,27 +484,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             option['label']?.toString() ??
                                 option['value']?.toString() ??
                                 '',
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       )
                       .toList(growable: false),
                   onChanged: _loading ? null : _changePeriod,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+              );
 
-          _PdfActionsCard(
-            busy: _pdfBusy,
-            onIncident: () => _selectSpecificPdf(_SpecificReportKind.incident),
-            onCase: () => _selectSpecificPdf(_SpecificReportKind.caseRecord),
-            onComplaint: () =>
-                _selectSpecificPdf(_SpecificReportKind.complaint),
-            onSos: () => _selectSpecificPdf(_SpecificReportKind.sos),
-            onPeriod: _downloadPeriodPdf,
-          ),
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    heading,
+                    const SizedBox(height: 14),
+                    timeline,
+                  ],
+                );
+              }
 
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: heading),
+                  const SizedBox(width: 12),
+                  timeline,
+                ],
+              );
+            },
+          ),
           const SizedBox(height: 16),
 
           if (_loading)
@@ -337,120 +524,110 @@ class _ReportsScreenState extends State<ReportsScreen> {
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _load)
           else ...<Widget>[
-            _SummaryGrid(
-              totalIncidents: _int(summary['total_incidents']),
-              activeIncidents: _int(summary['active_incidents']),
-              resolvedIncidents: _int(summary['resolved_incidents']),
-              casesFiled: _int(summary['cases_filed']),
+            _MetricGrid(
+              selectedMetric: _metric,
+              busy: _pdfBusy,
+              metrics: <_MetricDefinition>[
+                _MetricDefinition(
+                  key: 'total',
+                  label: 'Total Incidents',
+                  value: _int(summary['total_incidents']),
+                  helper: 'All incident records in the selected timeline',
+                ),
+                _MetricDefinition(
+                  key: 'active',
+                  label: 'Active Incidents',
+                  value: _int(summary['active_incidents']),
+                  helper: 'All current non-terminal incident statuses',
+                ),
+                _MetricDefinition(
+                  key: 'critical',
+                  label: 'Critical Incidents',
+                  value: _int(summary['critical_incidents']),
+                  helper: 'Unresolved critical-priority incidents',
+                ),
+                _MetricDefinition(
+                  key: 'resolved',
+                  label: 'Resolved Incidents',
+                  value: _int(summary['resolved_incidents']),
+                  helper: 'Resolved / completed / closed incidents',
+                ),
+                _MetricDefinition(
+                  key: 'distress',
+                  label: 'Distress Signals / SOS',
+                  value: _int(summary['distress_signals']),
+                  helper: 'Emergency SOS records in the selected timeline',
+                ),
+                _MetricDefinition(
+                  key: 'tanod',
+                  label: 'Tanod On Duty',
+                  value: _int(summary['tanod_on_duty']),
+                  helper: 'Current Tanod roster duty status',
+                ),
+              ],
+              onSelect: _selectMetric,
+              onDownload: _downloadMetricPdf,
             ),
             const SizedBox(height: 16),
             _Surface(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    '${_text(_data['period_label'], 'This Week')} Records Breakdown',
-                    style: TextStyle(
-                      color: palette.textMain,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Incidents, cases, and announcements recorded within the selected period.',
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              '${_selectedMetricLabel()} Records Breakdown',
+                              style: TextStyle(
+                                color: palette.textMain,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              '${_periodLabel()} · Tap any record to preview it without leaving Reports.',
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: records.isEmpty || _pdfBusy
+                            ? null
+                            : _selectRecordsPdf,
+                        icon: const Icon(Icons.checklist_rounded),
+                        label: const Text('Select Records PDF'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   if (records.isEmpty)
                     _EmptyPanel(
                       title: 'No records found',
                       message:
-                          'There are no recorded activities for ${_text(_data['period_label'], 'this period').toLowerCase()}.',
-                    )
-                  else ...<Widget>[
-                    for (
-                      var index = 0;
-                      index < visibleRecords.length;
-                      index++
-                    ) ...<Widget>[
-                      _RecordCard(record: visibleRecords[index]),
-                      if (index != visibleRecords.length - 1)
-                        const Divider(height: 24),
-                    ],
-                    if (records.length > 5) ...<Widget>[
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _showAllRecords = !_showAllRecords;
-                            });
-                          },
-                          icon: Icon(
-                            _showAllRecords
-                                ? Icons.expand_less_rounded
-                                : Icons.expand_more_rounded,
-                          ),
-                          label: Text(
-                            _showAllRecords
-                                ? 'Show Less'
-                                : 'Show All ${records.length} Records',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _showAllRecords
-                            ? 'Showing all ${records.length} records'
-                            : 'Showing 5 of ${records.length} records',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Surface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Tanod Response Summary',
-                    style: TextStyle(
-                      color: palette.textMain,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Acceptance and decline activity from Tanod Tasks within the selected period.',
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-                  if (tanodSummary.isEmpty)
-                    const _EmptyPanel(
-                      title: 'No tanod task responses in this period',
-                      message:
-                          'Response data will appear when tanods accept or decline tasks.',
+                          'No ${_selectedMetricLabel().toLowerCase()} records were recorded during ${_periodLabel().toLowerCase()}.',
                     )
                   else
                     for (
                       var index = 0;
-                      index < tanodSummary.length;
+                      index < records.length;
                       index++
                     ) ...<Widget>[
-                      _TanodSummaryCard(row: tanodSummary[index]),
-                      if (index != tanodSummary.length - 1)
-                        const SizedBox(height: 10),
+                      _RecordCard(
+                        record: records[index],
+                        onTap: () => _showRecordPreview(records[index]),
+                      ),
+                      if (index != records.length - 1)
+                        const Divider(height: 24),
                     ],
                 ],
               ),
@@ -467,6 +644,79 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  Future<void> _showRecordPreview(Map<String, dynamic> record) async {
+    final palette = TabangNowTheme.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: palette.surface,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          'Record Preview',
+                          style: TextStyle(
+                            color: palette.textMain,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _PreviewRow(
+                    label: 'Category',
+                    value: _text(record['category'], '—'),
+                  ),
+                  _PreviewRow(
+                    label: 'Details',
+                    value: _text(record['title'], '—'),
+                  ),
+                  _PreviewRow(
+                    label: 'Severity',
+                    value: _text(record['severity'], '—'),
+                  ),
+                  _PreviewRow(
+                    label: 'Barangay Areas',
+                    value: _text(record['barangay'], '—'),
+                  ),
+                  _PreviewRow(
+                    label: 'Status',
+                    value: _text(record['status'], '—'),
+                  ),
+                  _PreviewRow(
+                    label: 'Date & Time',
+                    value: _text(record['datetime'], '—'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _periodLabel() =>
+      _text(_data['period_label'], _fallbackPeriodLabel(_period));
+
+  String _selectedMetricLabel() =>
+      _text(_data['selected_metric_label'], _fallbackMetricLabel(_metric));
+
   void _show(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -474,118 +724,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 }
 
-class _PdfActionsCard extends StatelessWidget {
-  const _PdfActionsCard({
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({
+    required this.selectedMetric,
     required this.busy,
-    required this.onIncident,
-    required this.onCase,
-    required this.onComplaint,
-    required this.onSos,
-    required this.onPeriod,
+    required this.metrics,
+    required this.onSelect,
+    required this.onDownload,
   });
 
+  final String selectedMetric;
   final bool busy;
-  final VoidCallback onIncident;
-  final VoidCallback onCase;
-  final VoidCallback onComplaint;
-  final VoidCallback onSos;
-  final VoidCallback onPeriod;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = TabangNowTheme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(Icons.picture_as_pdf_rounded, color: palette.accentText),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  'PDF Reports',
-                  style: TextStyle(
-                    color: palette.textMain,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (busy)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Generate the same A4 PDF reports used by the website. The file is saved on the phone and opened in the installed PDF viewer for printing or sharing.',
-            style: TextStyle(
-              color: palette.textMuted,
-              fontSize: 12,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              OutlinedButton.icon(
-                onPressed: busy ? null : onIncident,
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('Incident PDF'),
-              ),
-              OutlinedButton.icon(
-                onPressed: busy ? null : onCase,
-                icon: const Icon(Icons.folder_open_outlined),
-                label: const Text('Case PDF'),
-              ),
-              OutlinedButton.icon(
-                onPressed: busy ? null : onComplaint,
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                label: const Text('Complaint PDF'),
-              ),
-              OutlinedButton.icon(
-                onPressed: busy ? null : onSos,
-                icon: const Icon(Icons.emergency_outlined),
-                label: const Text('SOS PDF'),
-              ),
-              FilledButton.icon(
-                onPressed: busy ? null : onPeriod,
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('Download PDF'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({
-    required this.totalIncidents,
-    required this.activeIncidents,
-    required this.resolvedIncidents,
-    required this.casesFiled,
-  });
-
-  final int totalIncidents;
-  final int activeIncidents;
-  final int resolvedIncidents;
-  final int casesFiled;
+  final List<_MetricDefinition> metrics;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -596,94 +748,117 @@ class _SummaryGrid extends StatelessWidget {
         return Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: <Widget>[
-            _SummaryCard(
-              width: width,
-              label: 'Total Incidents',
-              value: totalIncidents,
-              semantic: _SummarySemantic.primary,
-            ),
-            _SummaryCard(
-              width: width,
-              label: 'Active / Pending',
-              value: activeIncidents,
-              semantic: _SummarySemantic.warning,
-            ),
-            _SummaryCard(
-              width: width,
-              label: 'Resolved',
-              value: resolvedIncidents,
-              semantic: _SummarySemantic.success,
-            ),
-            _SummaryCard(
-              width: width,
-              label: 'Cases Filed',
-              value: casesFiled,
-              semantic: _SummarySemantic.indigo,
-            ),
-          ],
+          children: metrics
+              .map(
+                (metric) => _MetricCard(
+                  width: width,
+                  metric: metric,
+                  selected: metric.key == selectedMetric,
+                  busy: busy,
+                  onSelect: () => onSelect(metric.key),
+                  onDownload: () => onDownload(metric.key),
+                ),
+              )
+              .toList(growable: false),
         );
       },
     );
   }
 }
 
-enum _SummarySemantic { primary, warning, success, indigo }
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
     required this.width,
-    required this.label,
-    required this.value,
-    required this.semantic,
+    required this.metric,
+    required this.selected,
+    required this.busy,
+    required this.onSelect,
+    required this.onDownload,
   });
 
   final double width;
-  final String label;
-  final int value;
-  final _SummarySemantic semantic;
+  final _MetricDefinition metric;
+  final bool selected;
+  final bool busy;
+  final VoidCallback onSelect;
+  final VoidCallback onDownload;
 
   @override
   Widget build(BuildContext context) {
     final palette = TabangNowTheme.of(context);
 
-    final accent = switch (semantic) {
-      _SummarySemantic.primary => palette.accentText,
-      _SummarySemantic.warning =>
-        palette.isDark ? const Color(0xFFFDBA74) : const Color(0xFFEA580C),
-      _SummarySemantic.success =>
-        palette.isDark ? const Color(0xFF86EFAC) : const Color(0xFF16A34A),
-      _SummarySemantic.indigo =>
-        palette.isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F46E5),
-    };
-
     return Container(
       width: width,
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: palette.surface,
+        color: selected ? palette.accentSoft : palette.surface,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: palette.border),
+        border: Border.all(
+          color: selected ? palette.accentText : palette.border,
+          width: selected ? 2 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: palette.textMuted,
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.45,
+          InkWell(
+            onTap: onSelect,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          metric.label.toUpperCase(),
+                          style: TextStyle(
+                            color: palette.accentText,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.35,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 15,
+                        color: palette.accentText,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    metric.value.toString(),
+                    style: TextStyle(
+                      color: palette.textMain,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    metric.helper,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: palette.textMuted,
+                      fontSize: 10,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 9),
-          Text(
-            value.toString(),
-            style: TextStyle(
-              color: accent,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : onDownload,
+              icon: const Icon(Icons.picture_as_pdf_rounded, size: 17),
+              label: const Text('Download PDF'),
             ),
           ),
         ],
@@ -693,121 +868,124 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _RecordCard extends StatelessWidget {
-  const _RecordCard({required this.record});
+  const _RecordCard({required this.record, required this.onTap});
 
   final Map<String, dynamic> record;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = TabangNowTheme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(
-                color: palette.accentSoft,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                _text(record['category'], 'Record'),
-                style: TextStyle(
-                  color: palette.accentText,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
+            Row(
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.accentSoft,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _text(record['category'], 'Record'),
+                    style: TextStyle(
+                      color: palette.accentText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
+                const Spacer(),
+                Icon(
+                  Icons.visibility_outlined,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _text(record['datetime'], '—'),
+                  style: TextStyle(color: palette.textMuted, fontSize: 10),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Text(
+              _text(record['title'], 'Untitled record'),
+              style: TextStyle(
+                color: palette.textMain,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const Spacer(),
-            Text(
-              _text(record['datetime'], '—'),
-              style: TextStyle(color: palette.textMuted, fontSize: 10),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: <Widget>[
+                _TinyMeta(
+                  label: 'Severity',
+                  value: _text(record['severity'], '—'),
+                ),
+                _TinyMeta(
+                  label: 'Barangay',
+                  value: _text(record['barangay'], '—'),
+                ),
+                _TinyMeta(label: 'Status', value: _text(record['status'], '—')),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 9),
-        Text(
-          _text(record['title'], 'Untitled record'),
-          style: TextStyle(
-            color: palette.textMain,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 6,
-          children: <Widget>[
-            _TinyMeta(label: 'Severity', value: _text(record['severity'], '—')),
-            _TinyMeta(label: 'Barangay', value: _text(record['barangay'], '—')),
-            _TinyMeta(label: 'Status', value: _text(record['status'], '—')),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _TanodSummaryCard extends StatelessWidget {
-  const _TanodSummaryCard({required this.row});
+class _PreviewRow extends StatelessWidget {
+  const _PreviewRow({required this.label, required this.value});
 
-  final Map<String, dynamic> row;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     final palette = TabangNowTheme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.surfaceMuted,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            _text(row['name'], 'Tanod'),
-            style: TextStyle(
-              color: palette.textMain,
-              fontWeight: FontWeight.w900,
+          SizedBox(
+            width: 115,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: palette.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 14,
-            runSpacing: 8,
-            children: <Widget>[
-              _TinyMeta(
-                label: 'Total Tasks',
-                value: _int(row['total_tasks']).toString(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: palette.textMain,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
-              _TinyMeta(
-                label: 'Accepted',
-                value: _int(row['accepted']).toString(),
-              ),
-              _TinyMeta(
-                label: 'Declined',
-                value: _int(row['declined']).toString(),
-              ),
-              _TinyMeta(
-                label: 'Pending',
-                value: _int(row['pending']).toString(),
-              ),
-              _TinyMeta(
-                label: 'Response Rate',
-                value: '${_int(row['response_rate'])}%',
-              ),
-              _TinyMeta(
-                label: 'Last Response',
-                value: _text(row['last_response'], 'No response yet'),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -825,26 +1003,23 @@ class _TinyMeta extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = TabangNowTheme.of(context);
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 90, maxWidth: 180),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            label.toUpperCase(),
+    return Text.rich(
+      TextSpan(
+        children: <InlineSpan>[
+          TextSpan(
+            text: '$label: ',
             style: TextStyle(
               color: palette.textMuted,
-              fontSize: 8,
-              fontWeight: FontWeight.w900,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
+          TextSpan(
+            text: value,
             style: TextStyle(
-              color: palette.textSoft,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+              color: palette.textMain,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -863,7 +1038,7 @@ class _Surface extends StatelessWidget {
     final palette = TabangNowTheme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: palette.surface,
         borderRadius: BorderRadius.circular(18),
@@ -886,10 +1061,10 @@ class _EmptyPanel extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: palette.surfaceMuted,
-        borderRadius: BorderRadius.circular(14),
+        color: palette.accentSoft,
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(color: palette.border),
       ),
       child: Column(
@@ -902,7 +1077,7 @@ class _EmptyPanel extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
@@ -918,213 +1093,56 @@ class _ErrorCard extends StatelessWidget {
   const _ErrorCard({required this.message, required this.onRetry});
 
   final String message;
-  final Future<void> Function() onRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final palette = TabangNowTheme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.border),
-      ),
+    return _Surface(
       child: Column(
         children: <Widget>[
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 14),
-          OutlinedButton(onPressed: onRetry, child: const Text('Try Again')),
+          const Icon(Icons.error_outline_rounded, size: 42),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textMain),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
         ],
       ),
     );
   }
 }
 
-enum _SpecificReportKind {
-  incident,
-  caseRecord,
-  complaint,
-  sos;
+class _MetricDefinition {
+  const _MetricDefinition({
+    required this.key,
+    required this.label,
+    required this.value,
+    required this.helper,
+  });
 
-  String get title => switch (this) {
-    _SpecificReportKind.incident => 'Incident Report',
-    _SpecificReportKind.caseRecord => 'Case Report',
-    _SpecificReportKind.complaint => 'Complaint Report',
-    _SpecificReportKind.sos => 'SOS / Distress Signal Report',
-  };
-
-  String get singularLabel => switch (this) {
-    _SpecificReportKind.incident => 'incident',
-    _SpecificReportKind.caseRecord => 'case',
-    _SpecificReportKind.complaint => 'complaint',
-    _SpecificReportKind.sos => 'SOS / Distress Signal',
-  };
-
-  String get pluralLabel => switch (this) {
-    _SpecificReportKind.incident => 'Incidents',
-    _SpecificReportKind.caseRecord => 'Cases',
-    _SpecificReportKind.complaint => 'Complaints',
-    _SpecificReportKind.sos => 'SOS / Distress Signals',
-  };
+  final String key;
+  final String label;
+  final int value;
+  final String helper;
 }
 
-class _SpecificReportPicker extends StatefulWidget {
-  const _SpecificReportPicker({required this.kind, required this.options});
+class _PdfSelection {
+  const _PdfSelection({required this.all, required this.keys});
 
-  final _SpecificReportKind kind;
-  final List<Map<String, dynamic>> options;
-
-  @override
-  State<_SpecificReportPicker> createState() => _SpecificReportPickerState();
+  final bool all;
+  final List<String> keys;
 }
 
-class _SpecificReportPickerState extends State<_SpecificReportPicker> {
-  final _searchController = TextEditingController();
-
-  int? _selectedId;
-  String _query = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  List<Map<String, dynamic>> get _filtered {
-    final query = _query.trim().toLowerCase();
-
-    if (query.isEmpty) {
-      return widget.options;
-    }
-
-    return widget.options
-        .where(
-          (option) => _text(option['label'], '').toLowerCase().contains(query),
-        )
-        .toList(growable: false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = TabangNowTheme.of(context);
-
-    final height = MediaQuery.sizeOf(context).height * 0.82;
-
-    return SafeArea(
-      child: SizedBox(
-        height: height,
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    widget.kind.title,
-                    style: TextStyle(
-                      color: palette.textMain,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Generate a separate PDF report for one selected ${widget.kind.singularLabel} only.',
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search ${widget.kind.pluralLabel}',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _query = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: _filtered.length,
-                itemBuilder: (context, index) {
-                  final option = _filtered[index];
-
-                  final id = _int(option['id']);
-
-                  final selected = _selectedId == id;
-
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      enabled: id > 0,
-                      selected: selected,
-                      leading: Icon(
-                        selected
-                            ? Icons.check_circle_rounded
-                            : Icons.radio_button_unchecked_rounded,
-                        color: selected
-                            ? palette.accentText
-                            : palette.textMuted,
-                      ),
-                      title: Text(
-                        _text(option['label'], '${widget.kind.title} #$id'),
-                      ),
-                      onTap: id <= 0
-                          ? null
-                          : () {
-                              setState(() {
-                                _selectedId = id;
-                              });
-                            },
-                    ),
-                  );
-                },
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              decoration: BoxDecoration(
-                color: palette.surface,
-                border: Border(top: BorderSide(color: palette.border)),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _selectedId == null
-                          ? null
-                          : () => Navigator.of(context).pop(_selectedId),
-                      icon: const Icon(Icons.picture_as_pdf_rounded),
-                      label: const Text('Generate PDF'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Map<String, dynamic> _map(Object? value) {
+Map<String, dynamic> _map(dynamic value) {
   if (value is Map<String, dynamic>) {
     return value;
   }
@@ -1136,7 +1154,7 @@ Map<String, dynamic> _map(Object? value) {
   return <String, dynamic>{};
 }
 
-List<Map<String, dynamic>> _mapList(Object? value) {
+List<Map<String, dynamic>> _mapList(dynamic value) {
   if (value is! List) {
     return <Map<String, dynamic>>[];
   }
@@ -1147,7 +1165,13 @@ List<Map<String, dynamic>> _mapList(Object? value) {
       .toList(growable: false);
 }
 
-int _int(Object? value) {
+String _text(dynamic value, [String fallback = '']) {
+  final text = value?.toString().trim() ?? '';
+
+  return text.isEmpty ? fallback : text;
+}
+
+int _int(dynamic value) {
   if (value is int) {
     return value;
   }
@@ -1155,8 +1179,42 @@ int _int(Object? value) {
   return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
-String _text(Object? value, String fallback) {
-  final text = value?.toString().trim() ?? '';
+DateTime? _tryDate(dynamic value) {
+  final raw = value?.toString().trim() ?? '';
 
-  return text.isEmpty ? fallback : text;
+  if (raw.isEmpty) {
+    return null;
+  }
+
+  return DateTime.tryParse(raw);
+}
+
+String _dateString(DateTime value) {
+  final year = value.year.toString().padLeft(4, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+
+  return '$year-$month-$day';
+}
+
+String _fallbackPeriodLabel(String period) {
+  return switch (period) {
+    'today' => 'Today',
+    'week' => 'Last 7 Days',
+    'month' => 'Last 30 Days',
+    'year' => 'This Year',
+    'custom' => 'Custom / Previous Dates',
+    _ => 'Reports',
+  };
+}
+
+String _fallbackMetricLabel(String metric) {
+  return switch (metric) {
+    'active' => 'Active Incidents',
+    'critical' => 'Critical Incidents',
+    'resolved' => 'Resolved Incidents',
+    'distress' => 'Distress Signals / SOS',
+    'tanod' => 'Tanod On Duty',
+    _ => 'Total Incidents',
+  };
 }

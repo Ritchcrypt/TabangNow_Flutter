@@ -30,6 +30,7 @@ class AnnouncementService {
     required String category,
     required String priority,
     required String audience,
+    required List<int> barangayIds,
     required bool calamityMode,
     required bool showInWeatherFeed,
   }) async {
@@ -43,11 +44,47 @@ class AnnouncementService {
           'category': category,
           'priority': priority,
           'audience': audience,
+          'barangay_ids': barangayIds,
           'activate_calamity_mode': calamityMode,
           'show_in_weather_feed': showInWeatherFeed,
         }),
       ),
     );
+  }
+
+
+  Future<List<Map<String, dynamic>>> barangayOptions() async {
+    /*
+     * Capstone 18 announcement targeting requires canonical barangay IDs.
+     * The announcement API may expose them directly in options on newer
+     * backend builds. For compatibility with the current feature branch,
+     * reuse the established incident create-options endpoint, which already
+     * returns the same canonical Dao barangay records to announcement
+     * managers (admin/official roles).
+     */
+    final response = await _request(
+      () async => _client.get(
+        Uri.parse('$baseUrl/api/v1/incidents/options'),
+        headers: await _headers(),
+      ),
+    );
+
+    final data = _map(response['data']);
+    final barangays = data['barangays'];
+
+    if (barangays is! List) {
+      return <Map<String, dynamic>>[];
+    }
+
+    return barangays
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .where((item) {
+          final id = int.tryParse(item['id']?.toString() ?? '');
+          final name = item['name']?.toString().trim() ?? '';
+          return id != null && id > 0 && name.isNotEmpty;
+        })
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> toggle(int announcementId) async {
@@ -106,6 +143,19 @@ class AnnouncementService {
     }
 
     throw AuthException(_message(data), statusCode: response.statusCode);
+  }
+
+
+  Map<String, dynamic> _map(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+
+    return <String, dynamic>{};
   }
 
   Map<String, dynamic> _decode(String body) {

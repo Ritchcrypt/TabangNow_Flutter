@@ -39,7 +39,6 @@ import 'resident_complaint_detail_screen.dart';
 import 'resident_complaints_screen.dart';
 import 'tanod_roster_screen.dart';
 import 'tanod_tasks_screen.dart';
-import 'case_management_screen.dart';
 import 'system_branding_screen.dart';
 
 const String _tabangNowWebsiteLogoBase64 =
@@ -54,7 +53,6 @@ enum _HomeModule {
   tanodAlerts,
   tanodRoster,
   tanodTasks,
-  caseManagement,
   announcements,
   hotlines,
   residentComplaints,
@@ -502,11 +500,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         break;
 
       case 'caseManagement':
-        if (ModuleRegistry.canAccess(_appRole, AppModuleId.caseManagement)) {
-          _selectModule(_HomeModule.caseManagement);
-          return;
-        }
-
+        // Case Management is retired from the mobile shell.
+        // Preserve old notification compatibility by returning
+        // users safely to Dashboard.
         _selectModule(_HomeModule.dashboard);
         return;
 
@@ -673,11 +669,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return TanodRosterScreen(authService: _authService, user: widget.user);
       case _HomeModule.tanodTasks:
         return TanodTasksScreen(authService: _authService, user: widget.user);
-      case _HomeModule.caseManagement:
-        return CaseManagementScreen(
-          authService: _authService,
-          user: widget.user,
-        );
       case _HomeModule.residentComplaints:
         return ResidentComplaintsScreen(
           authService: _authService,
@@ -894,7 +885,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     AppModuleId.tanodAlerts => _HomeModule.tanodAlerts,
     AppModuleId.tanodRoster => _HomeModule.tanodRoster,
     AppModuleId.tanodTasks => _HomeModule.tanodTasks,
-    AppModuleId.caseManagement => _HomeModule.caseManagement,
     AppModuleId.announcements => _HomeModule.announcements,
     AppModuleId.emergencyHotlines => _HomeModule.hotlines,
     AppModuleId.residentComplaints => _HomeModule.residentComplaints,
@@ -912,7 +902,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _HomeModule.tanodAlerts => AppModuleId.tanodAlerts,
     _HomeModule.tanodRoster => AppModuleId.tanodRoster,
     _HomeModule.tanodTasks => AppModuleId.tanodTasks,
-    _HomeModule.caseManagement => AppModuleId.caseManagement,
     _HomeModule.announcements => AppModuleId.announcements,
     _HomeModule.hotlines => AppModuleId.emergencyHotlines,
     _HomeModule.residentComplaints => AppModuleId.residentComplaints,
@@ -1036,9 +1025,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           return;
         }
 
-        if (metric.label == 'Active Cases' &&
-            ModuleRegistry.canAccess(_appRole, AppModuleId.caseManagement)) {
-          _selectModule(_HomeModule.caseManagement);
+        if (metric.label == 'Active Cases') {
+          _selectModule(_HomeModule.incidents);
           return;
         }
 

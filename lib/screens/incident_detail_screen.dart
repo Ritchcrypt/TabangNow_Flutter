@@ -10,9 +10,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../services/auth_service.dart';
-import '../services/case_management_service.dart';
 import '../services/incident_service.dart';
-import 'case_form_screen.dart';
 
 class IncidentDetailScreen extends StatefulWidget {
   const IncidentDetailScreen({
@@ -197,86 +195,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         _escalationReasonController.clear();
       },
     );
-  }
-
-  Future<void> _createRelatedCase() async {
-    if (_role != 'admin' || _actionBusy) {
-      return;
-    }
-
-    setState(() {
-      _actionBusy = true;
-    });
-
-    try {
-      final service = CaseManagementService(
-        authService: widget.incidentService.authService,
-      );
-
-      final response = await service.index(page: 1);
-      final options = _map(response['options']);
-      final caseTypes = _mapList(options['case_types']);
-      final caseStatuses = _mapList(options['case_statuses']);
-      final incidents = _mapList(options['incidents']);
-
-      final hasCurrentIncident = incidents.any(
-        (item) => _toInt(item['id']) == widget.incidentId,
-      );
-
-      if (!hasCurrentIncident) {
-        final title =
-            _incident['title']?.toString().trim() ?? 'Untitled Incident';
-
-        incidents.insert(0, <String, dynamic>{
-          'id': widget.incidentId,
-          'title': title,
-          'label': 'Incident #${widget.incidentId} — $title',
-        });
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _actionBusy = false;
-      });
-
-      final message = await Navigator.of(context).push<String>(
-        MaterialPageRoute<String>(
-          builder: (_) => CaseFormScreen(
-            service: service,
-            caseTypes: caseTypes,
-            caseStatuses: caseStatuses,
-            incidents: incidents,
-            initialIncidentId: widget.incidentId,
-          ),
-        ),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (message != null && message.trim().isNotEmpty) {
-        _showMessage(message);
-        await _load();
-      }
-    } on AuthException catch (exception) {
-      if (mounted) {
-        _showMessage(exception.message);
-      }
-    } catch (_) {
-      if (mounted) {
-        _showMessage('Unable to open the Create Case form.');
-      }
-    } finally {
-      if (mounted && _actionBusy) {
-        setState(() {
-          _actionBusy = false;
-        });
-      }
-    }
   }
 
   Future<void> _runAction({
@@ -666,12 +584,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         ),
         if (_role == 'admin') ...<Widget>[
           const SizedBox(height: 16),
-          _RelatedCasesSection(
-            relatedCases: relatedCases,
-            onCreateCase: relatedCases.isEmpty && !_actionBusy
-                ? _createRelatedCase
-                : null,
-          ),
+          _RelatedCasesSection(relatedCases: relatedCases, onCreateCase: null),
         ],
         if (_can('can_update')) ...<Widget>[
           const SizedBox(height: 16),
@@ -767,29 +680,26 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                   value: -1,
                   child: Text('Unassigned'),
                 ),
-                ...responders
-                    .map((responder) {
-                      final id = _toInt(responder['id']);
+                ...responders.map((responder) {
+                  final id = _toInt(responder['id']);
 
-                      if (id == null) {
-                        return null;
-                      }
+                  if (id == null) {
+                    return null;
+                  }
 
-                      return DropdownMenuItem<int>(
-                        value: id,
-                        child: Text(
-                          responder['name']?.toString() ?? 'Tanod #$id',
-                        ),
-                      );
-                    })
-                    .whereType<DropdownMenuItem<int>>(),
+                  return DropdownMenuItem<int>(
+                    value: id,
+                    child: Text(responder['name']?.toString() ?? 'Tanod #$id'),
+                  );
+                }).whereType<DropdownMenuItem<int>>(),
               ],
               onChanged: _actionBusy
                   ? null
                   : (value) {
                       setState(() {
-                        _selectedResponderId =
-                            value == null || value < 1 ? null : value;
+                        _selectedResponderId = value == null || value < 1
+                            ? null
+                            : value;
                         _assignmentChanged = true;
                       });
                     },

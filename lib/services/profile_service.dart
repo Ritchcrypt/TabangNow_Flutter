@@ -31,6 +31,7 @@ class ProfileService {
     required String email,
     String? contactNumber,
     String? address,
+    int? barangayId,
     String? profilePhotoPath,
   }) async {
     final request = http.MultipartRequest(
@@ -44,6 +45,7 @@ class ProfileService {
       'email': email.trim(),
       'contact_number': contactNumber?.trim() ?? '',
       'address': address?.trim() ?? '',
+      if (barangayId != null) 'barangay_id': barangayId.toString(),
     });
 
     if (profilePhotoPath != null && profilePhotoPath.trim().isNotEmpty) {
