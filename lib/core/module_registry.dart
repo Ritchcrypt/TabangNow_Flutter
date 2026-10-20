@@ -113,7 +113,10 @@ class ModuleRegistry {
     return _modules
         .where(
           (definition) =>
-              definition.showInNavigation && canAccess(role, definition.id),
+              definition.showInNavigation &&
+              canAccess(role, definition.id) &&
+              !(role == AppRole.tanod &&
+                  definition.id == AppModuleId.distressSignal),
         )
         .toList(growable: false);
   }

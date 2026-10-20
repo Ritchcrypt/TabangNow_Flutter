@@ -822,11 +822,6 @@ class _MetricCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 15,
-                        color: palette.accentText,
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),

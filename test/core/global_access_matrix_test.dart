@@ -68,6 +68,7 @@ void main() {
 
       expect(modules, isNot(contains(AppModuleId.tanodRoster)));
       expect(modules, isNot(contains(AppModuleId.residentComplaints)));
+      expect(modules, isNot(contains(AppModuleId.distressSignal)));
       expect(modules, isNot(contains(AppModuleId.barangayMap)));
       expect(modules, isNot(contains(AppModuleId.userManagement)));
     });

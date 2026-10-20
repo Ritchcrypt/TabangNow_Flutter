@@ -916,7 +916,6 @@ class _UserCard extends StatelessWidget {
                   style: TextStyle(color: palette.textMuted, fontSize: 10),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, size: 20),
               ],
             ),
           ],

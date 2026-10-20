@@ -19,6 +19,27 @@ void main() {
     expect(block, contains('mobileImplemented: true'));
   });
 
+  test('Tanod Task assignments use the existing Code Red alert', () {
+    final source = File(
+      'lib/services/background_notification_alert_service.dart',
+    ).readAsStringSync();
+
+    final start = source.indexOf('const codeRedTypes = <String>{');
+    expect(start, greaterThanOrEqualTo(0));
+
+    final end = source.indexOf('};', start);
+    expect(end, greaterThan(start));
+
+    final codeRedTypes = source.substring(start, end);
+
+    expect(codeRedTypes, contains("'tanod_task'"));
+    expect(codeRedTypes, contains("'tanod_task_assigned'"));
+    expect(codeRedTypes, contains("'task_assigned'"));
+
+    expect(source, contains('tabangnow_notification_v4'));
+    expect(source, contains('_criticalVibrationPattern'));
+  });
+
   test('HomeScreen connects Tanod Tasks globally', () {
     final home = File('lib/screens/home_screen.dart').readAsStringSync();
 

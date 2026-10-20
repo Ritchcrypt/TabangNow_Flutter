@@ -838,6 +838,11 @@ class TabangNowNotificationAlert {
       'mobile_emergency_acknowledged',
       'mobile_emergency_resolved',
 
+      // Tanod Task assignments
+      'tanod_task',
+      'tanod_task_assigned',
+      'task_assigned',
+
       // Incidents
       'incident',
       'incident_reported',

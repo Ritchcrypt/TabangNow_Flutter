@@ -1552,11 +1552,6 @@ class _SummaryCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 17,
-                      color: metric.accent,
-                    ),
                   ],
                 ),
                 if ((metric.subtitle ?? '').isNotEmpty) ...<Widget>[

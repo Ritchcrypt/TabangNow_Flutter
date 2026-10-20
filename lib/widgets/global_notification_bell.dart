@@ -758,7 +758,7 @@ class _NotificationSheet extends StatelessWidget {
                                             ),
                                           ),
                                           Text(
-                                            'Open →',
+                                            'Open',
                                             style: TextStyle(
                                               color: theme.colorScheme.primary,
                                               fontSize: 11,
