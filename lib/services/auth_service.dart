@@ -27,6 +27,7 @@ class AuthService {
     required String password,
     required String deviceName,
     bool remember = false,
+    String? mfaCode,
   }) async {
     late final http.Response response;
 
@@ -42,6 +43,7 @@ class AuthService {
               'email': email.trim(),
               'password': password,
               'device_name': deviceName.trim(),
+              if (mfaCode != null) 'mfa_code': mfaCode.trim(),
             }),
           )
           .timeout(_requestTimeout);
@@ -60,6 +62,11 @@ class AuthService {
     }
 
     final data = _decodeResponse(response);
+
+    // A successful password step is not yet an authenticated session.
+    if (response.statusCode == 202 && data['mfa_required'] == true) {
+      return data;
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final token = data['access_token'];
@@ -322,6 +329,18 @@ class AuthService {
 
     if (statusCode == 401 || inactiveAccount) {
       await clearToken();
+    }
+  }
+
+  /// Replace a revoked MFA-pre-enrollment token without changing Remember Me.
+  Future<void> replaceAccessToken(String token) async {
+    if (token.trim().isEmpty) {
+      throw const AuthException('The new session token is missing.');
+    }
+    final remembered = await _storage.read(key: _tokenKey);
+    _sessionToken = token;
+    if (remembered != null && remembered.isNotEmpty) {
+      await _storage.write(key: _tokenKey, value: token);
     }
   }
 

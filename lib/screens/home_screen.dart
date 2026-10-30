@@ -18,6 +18,7 @@ import '../core/app_role.dart';
 import '../core/module_registry.dart';
 
 import '../services/auth_service.dart';
+import '../widgets/shared_dashboard_welcome_banner.dart';
 import '../services/branding_service.dart';
 import '../services/incident_service.dart';
 import '../services/resident_complaint_service.dart';
@@ -956,6 +957,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: <Widget>[
+          SharedDashboardWelcomeBanner(
+            authService: _authService,
+            userName: _userName,
+            isAdmin: _role == 'admin',
+          ),
+          const SizedBox(height: 20),
           if (isAdminOrOfficial)
             _DashboardTitleBlock(
               title: _role == 'admin'
@@ -1074,8 +1081,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
-            label: 'Active Cases',
-            value: value('active_cases'),
+            label: 'Active Incidents',
+            value: value('active_incidents'),
             icon: Icons.schedule_rounded,
             accent: const Color(0xFFD97706),
             background: TabangNowTheme.of(context).surface,
@@ -1091,7 +1098,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           _DashboardMetric(
             label: 'Resolved',
-            value: value('resolved_cases'),
+            value: value('resolved_incidents'),
             icon: Icons.check_circle_rounded,
             accent: const Color(0xFF059669),
             background: TabangNowTheme.of(context).surface,
@@ -1109,12 +1116,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       case 'official':
       case 'dao':
-        final activeCases =
-            summary['active_cases'] ??
-            (_asInt(summary['pending_incidents']) +
-                _asInt(summary['active_incidents']));
-        final resolvedCases =
-            summary['resolved_cases'] ?? summary['resolved_incidents'] ?? 0;
+        final activeIncidents = summary['active_incidents'] ?? 0;
+        final resolvedIncidents = summary['resolved_incidents'] ?? 0;
 
         return <_DashboardMetric>[
           _DashboardMetric(
@@ -1126,8 +1129,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
-            label: 'Active Cases',
-            value: activeCases.toString(),
+            label: 'Active Incidents',
+            value: activeIncidents.toString(),
             icon: Icons.schedule_rounded,
             accent: const Color(0xFFD97706),
             background: TabangNowTheme.of(context).surface,
@@ -1143,7 +1146,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           _DashboardMetric(
             label: 'Resolved',
-            value: resolvedCases.toString(),
+            value: resolvedIncidents.toString(),
             icon: Icons.check_circle_rounded,
             accent: const Color(0xFF059669),
             background: TabangNowTheme.of(context).surface,
@@ -1307,14 +1310,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     return <String, dynamic>{};
-  }
-
-  static int _asInt(dynamic value) {
-    if (value is int) {
-      return value;
-    }
-
-    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   static List<Map<String, dynamic>> _mapList(dynamic raw) {

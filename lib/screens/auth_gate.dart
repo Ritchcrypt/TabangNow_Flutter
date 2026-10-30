@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/global_theme_controller.dart';
 
 import '../services/auth_service.dart';
+import '../widgets/admin_mfa_code_prompt.dart';
 import '../widgets/sos_flip_coin_button.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
@@ -99,12 +100,29 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      final response = await _authService.login(
+      var response = await _authService.login(
         email: _emailController.text,
         password: _passwordController.text,
         deviceName: 'TabangNow Android',
         remember: _rememberMe,
       );
+
+      if (response['mfa_required'] == true) {
+        if (!mounted) return;
+        final code = await requestAdminMfaCode(context);
+        if (!mounted) return;
+        if (code == null || code.isEmpty) {
+          setState(() => _loggingIn = false);
+          return;
+        }
+        response = await _authService.login(
+          email: _emailController.text,
+          password: _passwordController.text,
+          deviceName: 'TabangNow Android',
+          remember: _rememberMe,
+          mfaCode: code,
+        );
+      }
 
       final rawUser = response['user'];
       if (rawUser is! Map) {

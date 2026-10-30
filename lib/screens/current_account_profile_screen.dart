@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/global_image_crop_service.dart';
 import '../services/native_push_service.dart';
 import '../services/profile_service.dart';
+import 'account_mfa_screen.dart';
 
 class CurrentAccountProfileScreen extends StatefulWidget {
   const CurrentAccountProfileScreen({
@@ -1038,6 +1039,32 @@ class _CurrentAccountProfileScreenState
             ),
           ),
         ],
+        const SizedBox(height: 14),
+        _section(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Two-Factor Authentication (MFA)',
+                style: TextStyle(color: palette.textMain, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text('Account Security: enable or manage an authenticator for safer sign-in.',
+                style: TextStyle(color: palette.textMuted, fontSize: 13)),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AccountMfaScreen(authService: widget.authService),
+                    ),
+                  ),
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Manage Two-Factor Authentication'),
+                ),
+              ),
+            ],
+          ),
+        ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: 12),
           Text(

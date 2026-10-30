@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../widgets/admin_mfa_code_prompt.dart';
 import '../widgets/public_auth_branding_header.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
@@ -42,12 +43,25 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final response = await _authService.login(
+      var response = await _authService.login(
         email: _emailController.text,
         password: _passwordController.text,
         deviceName: 'TabangNow Android',
         remember: _rememberMe,
       );
+
+      if (response['mfa_required'] == true) {
+        if (!mounted) return;
+        final code = await requestAdminMfaCode(context);
+        if (!mounted || code == null || code.isEmpty) return;
+        response = await _authService.login(
+          email: _emailController.text,
+          password: _passwordController.text,
+          deviceName: 'TabangNow Android',
+          remember: _rememberMe,
+          mfaCode: code,
+        );
+      }
 
       final rawUser = response['user'];
 
