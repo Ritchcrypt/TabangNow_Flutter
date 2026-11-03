@@ -136,6 +136,49 @@ class AuthService {
     );
   }
 
+  /// Complete an emailed password reset inside the Flutter application.
+  /// Uses the same reset token broker as the Laravel website.
+  Future<String> completePasswordReset({
+    required String token,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    late final http.Response response;
+
+    try {
+      response = await _client
+          .post(
+            Uri.parse('$_baseUrl/api/v1/auth/reset-password'),
+            headers: const <String, String>{
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(<String, String>{
+              'token': token,
+              'email': email.trim().toLowerCase(),
+              'password': password,
+              'password_confirmation': passwordConfirmation,
+            }),
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const AuthException('Unable to connect to TabangNow right now. Please try again.');
+    } on SocketException {
+      throw const AuthException('Unable to connect to TabangNow right now. Please try again.');
+    } on http.ClientException {
+      throw const AuthException('Unable to connect to TabangNow right now. Please try again.');
+    }
+
+    final data = _decodeResponse(response);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data['message']?.toString() ?? 'Password reset successfully.';
+    }
+    throw AuthException(
+      _extractErrorMessage(data),
+      statusCode: response.statusCode,
+    );
+  }
   Future<Map<String, dynamic>> devSession() async {
     final response = await _client.post(
       Uri.parse('$_baseUrl/api/v1/auth/dev-session'),

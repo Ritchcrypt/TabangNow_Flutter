@@ -61,6 +61,14 @@ if (Test-PrivateOrLocalHost -HostName $uri.Host) {
     throw "Production APK cannot target localhost/private-network host: $($uri.Host)"
 }
 
+if ($uri.Port -ne 443 -or
+    $uri.UserInfo -or
+    ($uri.AbsolutePath -ne "/" -and $uri.AbsolutePath -ne "") -or
+    $uri.Query -or
+    $uri.Fragment) {
+    throw "Production API_BASE_URL must be the bare HTTPS origin, without credentials, paths, queries, fragments, or a custom port."
+}
+
 if ($normalizedApiUrl -match "/api(/|$)" -or $normalizedApiUrl -match "/api/v1") {
     throw @"
 Pass the Laravel ROOT URL, not /api or /api/v1.
@@ -139,7 +147,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[2/5] flutter analyze" -ForegroundColor Yellow
-flutter analyze --no-fatal-infos --no-fatal-warnings
+flutter analyze
 if ($LASTEXITCODE -ne 0) {
     throw "flutter analyze failed."
 }
@@ -151,12 +159,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[4/5] Building signed release APK" -ForegroundColor Yellow
-flutter build apk `
-    --release `
-    "--dart-define=API_BASE_URL=$normalizedApiUrl"
 
-if ($LASTEXITCODE -ne 0) {
-    throw "flutter build apk --release failed."
+# Gradle reads ORG_GRADLE_PROJECT_* environment variables as project
+# properties. This supplies the verified HTTPS host to AndroidManifest.xml.
+# Restore the caller's environment even if the build fails.
+$resetHostEnvironmentName = "ORG_GRADLE_PROJECT_TABANGNOW_RESET_HOST"
+$previousResetHost = [Environment]::GetEnvironmentVariable(
+    $resetHostEnvironmentName, "Process"
+)
+try {
+    [Environment]::SetEnvironmentVariable(
+        $resetHostEnvironmentName, $uri.Host, "Process"
+    )
+    flutter build apk `
+        --release `
+        "--dart-define=API_BASE_URL=$normalizedApiUrl"
+    if ($LASTEXITCODE -ne 0) {
+        throw "flutter build apk --release failed."
+    }
+}
+finally {
+    [Environment]::SetEnvironmentVariable(
+        $resetHostEnvironmentName, $previousResetHost, "Process"
+    )
 }
 
 $builtApk = Join-Path `
@@ -206,6 +231,24 @@ if ([string]::IsNullOrWhiteSpace($apksigner)) {
 if ($LASTEXITCODE -ne 0) {
     throw "APK signature verification failed."
 }
+
+# Fail closed if the final APK does not actually claim the TabangNow
+# production password-reset host in its compiled Android manifest.
+$aapt = Join-Path (Split-Path -Parent $apksigner) "aapt.exe"
+if (-not (Test-Path -LiteralPath $aapt)) {
+    throw "aapt.exe is required to verify the release App Link host."
+}
+$manifestText = (& $aapt dump xmltree $builtApk AndroidManifest.xml 2>&1 | Out-String)
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to inspect the built APK Android manifest."
+}
+$hostLine = @($manifestText -split '\r?\n' | Where-Object {
+    $_ -match 'android:host' -and $_ -match [Regex]::Escape($uri.Host)
+})
+if ($hostLine.Count -eq 0) {
+    throw "APK reset-link host does not match production API host: $($uri.Host)"
+}
+Write-Host "Verified APK App Link host: $($uri.Host)" -ForegroundColor Green
 
 $distDir = Join-Path $flutterRoot "dist"
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null

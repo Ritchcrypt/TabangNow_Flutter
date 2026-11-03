@@ -3,6 +3,7 @@ package ph.tabangnow.dao
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
@@ -15,6 +16,25 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private fun extractResetLink(intent: Intent?): String? {
+        val link = intent?.data ?: return null
+        if (link.scheme != "https") return null
+        val path = link.pathSegments ?: return null
+        if (path.size != 2 || path[0] != "reset-password" || path[1].isBlank()) return null
+        if (link.getQueryParameter("email").isNullOrBlank()) return null
+        return link.toString()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        extractResetLink(intent)?.let { url ->
+            flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                MethodChannel(messenger, "tabangnow/password_reset_links")
+                    .invokeMethod("onResetLink", url)
+            }
+        }
+    }
     companion object {
         private const val notificationChannelId = "tabangnow_notifications_v4"
         private const val notificationFeedbackChannel =
@@ -24,6 +44,15 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "tabangnow/password_reset_links",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialResetLink" -> result.success(extractResetLink(intent))
+                else -> result.notImplemented()
+            }
+        }
         createNotificationChannel()
 
         MethodChannel(
