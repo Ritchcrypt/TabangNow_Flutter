@@ -250,6 +250,50 @@ if ($hostLine.Count -eq 0) {
 }
 Write-Host "Verified APK App Link host: $($uri.Host)" -ForegroundColor Green
 
+# TABANGNOW_ORIGINAL_SOUND_RELEASE_GATE
+# Android release optimization may rename res/raw paths; verify uncompressed
+# audio bytes against the four existing original sources. Fail before distribution.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$originalAudio = @(
+    'tabangnow_notification_v4.mp3',
+    'tabangnow_moderate_v1.mp3',
+    'tabangnow_low_v1.mp3',
+    'tabangnow_notification.wav'
+)
+$audioZip = $null
+try {
+    $audioZip = [System.IO.Compression.ZipFile]::OpenRead($builtApk)
+    $audioEntries = @($audioZip.Entries | Where-Object { $_.FullName -match '(?i)^res/.*\.(mp3|wav|ogg)$' })
+    $packagedAudio = @()
+    foreach ($entry in $audioEntries) {
+        $stream = $null
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $stream = $entry.Open()
+            $bytes = $sha.ComputeHash($stream)
+            $hex = ([BitConverter]::ToString($bytes) -replace '-', '')
+            $packagedAudio += [pscustomobject]@{ Hash=$hex; Name=$entry.FullName; Bytes=$entry.Length }
+        }
+        finally {
+            if ($null -ne $stream) { $stream.Dispose() }
+            $sha.Dispose()
+        }
+    }
+    foreach ($sound in $originalAudio) {
+        $source = Join-Path $flutterRoot ("android\app\src\main\res\raw\" + $sound)
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "RELEASE BLOCKED: missing source $sound" }
+        $expected = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+        $expectedSize = (Get-Item -LiteralPath $source).Length
+        $hit = @($packagedAudio | Where-Object { $_.Hash -eq $expected -and $_.Bytes -eq $expectedSize })
+        if ($hit.Count -ne 1) { throw "RELEASE BLOCKED: original $sound not included byte-identically in APK." }
+        Write-Host "Packaged original: $sound -> $($hit[0].Name)" -ForegroundColor Green
+    }
+}
+finally {
+    if ($null -ne $audioZip) { $audioZip.Dispose() }
+}
+
 $distDir = Join-Path $flutterRoot "dist"
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 
