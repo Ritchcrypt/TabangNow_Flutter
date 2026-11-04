@@ -249,7 +249,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     Widget? suffixIcon,
   }) {
     final theme = _registrationLightTheme(context);
-    // TABANGNOW_SIGNUP_FIELD_LIGHT
 
     return InputDecoration(
       hintText: hint,
@@ -285,7 +284,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = _registrationLightTheme(context);
-    // TABANGNOW_SIGNUP_LIGHT_BUILD
 
     return Theme(
       data: theme,
@@ -300,7 +298,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               constraints: const BoxConstraints(maxWidth: 440),
               child: Column(
                 children: <Widget>[
-                  // TABANGNOW_SIGNUP_BRANDING_LIGHT
                   const PublicAuthBrandingHeader(logoSize: 104),
                   const SizedBox(height: 32),
                   Container(

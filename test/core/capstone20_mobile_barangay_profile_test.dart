@@ -13,7 +13,12 @@ void main() {
 
       expect(screen.contains('Brightness.light'), isTrue);
 
-      expect(screen.contains('TABANGNOW_SIGNUP_BRANDING_LIGHT'), isTrue);
+      // Verify the real screen structure, not a historical code comment.
+      expect(screen.contains('data: theme,'), isTrue);
+      expect(
+        screen.contains('const PublicAuthBrandingHeader(logoSize: 104)'),
+        isTrue,
+      );
 
       expect(screen.contains('Barangay of residence'), isTrue);
     });
