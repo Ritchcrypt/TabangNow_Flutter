@@ -98,10 +98,21 @@ class NativePushBridge {
   }
 }
 
+/// Android shows FCM notification payloads automatically in the background.
+/// Only data-only messages need Flutter to create a local notification.
+/// Foreground rendering continues through FirebaseMessaging.onMessage.
+bool shouldRenderLocalBackgroundPush(RemoteMessage message) {
+  return message.notification == null;
+}
+
 @pragma('vm:entry-point')
 Future<void> tabangNowFirebaseMessagingBackgroundHandler(
   RemoteMessage message,
 ) async {
+  if (!shouldRenderLocalBackgroundPush(message)) {
+    return;
+  }
+
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
