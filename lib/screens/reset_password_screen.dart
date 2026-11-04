@@ -92,20 +92,37 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reset password')),
+    final baseTheme = Theme.of(context);
+    final theme = baseTheme.copyWith(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: baseTheme.colorScheme.primary,
+        brightness: Brightness.light,
+      ).copyWith(surface: Colors.white),
+      scaffoldBackgroundColor: Colors.white,
+    );
+    return Theme(
+      data: theme,
+      child: Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Reset password'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        foregroundColor: theme.colorScheme.onSurface,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(22, 24, 22, 32),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: const BoxConstraints(maxWidth: 440),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(24, 26, 24, 26),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: theme.dividerColor),
                 ),
                 child: Form(
@@ -113,7 +130,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      const PublicAuthBrandingHeader(logoSize: 68),
+                      const PublicAuthBrandingHeader(logoSize: 104),
                       const SizedBox(height: 20),
                       const Text('Set your new password',
                           style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
@@ -176,6 +193,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

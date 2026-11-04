@@ -1032,11 +1032,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           return;
         }
 
-        if (metric.label == 'Active Cases') {
-          _selectModule(_HomeModule.incidents);
-          return;
-        }
-
         _selectModule(_HomeModule.incidents);
         return;
 

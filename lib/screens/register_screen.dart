@@ -235,11 +235,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       brightness: Brightness.light,
     );
 
-    return ThemeData(
+    // Match the login page palette and typography while keeping signup light.
+    return inherited.copyWith(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: Colors.white,
+      colorScheme: scheme.copyWith(surface: Colors.white),
+      scaffoldBackgroundColor: const Color(0xFFF4F7FB),
     );
   }
 
@@ -287,36 +288,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final theme = _registrationLightTheme(context);
     // TABANGNOW_SIGNUP_LIGHT_BUILD
 
-    return Scaffold(
+    return Theme(
+      data: theme,
+      child: Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Create account'),
-        backgroundColor: theme.colorScheme.surface,
-        surfaceTintColor: theme.colorScheme.surface,
-        foregroundColor: theme.colorScheme.onSurface,
-        elevation: 0,
-      ),
       body: SafeArea(
-        top: false,
+        top: true,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 32),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: const BoxConstraints(maxWidth: 440),
               child: Column(
                 children: <Widget>[
                   // TABANGNOW_SIGNUP_BRANDING_LIGHT
-                  Theme(
-                    data: theme,
-                    child: const PublicAuthBrandingHeader(logoSize: 78),
-                  ),
-                  const SizedBox(height: 26),
+                  const PublicAuthBrandingHeader(logoSize: 104),
+                  const SizedBox(height: 32),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: theme.dividerColor),
                     ),
                     child: Form(
@@ -730,6 +723,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

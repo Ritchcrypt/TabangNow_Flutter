@@ -366,7 +366,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     final location = _map(incident['location']);
     final evidence = _mapList(incident['evidence']);
     final histories = _mapList(incident['status_history']);
-    final relatedCases = _mapList(incident['related_cases']);
 
     final latitude = _toDouble(location['latitude']);
     final longitude = _toDouble(location['longitude']);
@@ -582,10 +581,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
             ],
           ),
         ),
-        if (_role == 'admin') ...<Widget>[
-          const SizedBox(height: 16),
-          _RelatedCasesSection(relatedCases: relatedCases, onCreateCase: null),
-        ],
         if (_can('can_update')) ...<Widget>[
           const SizedBox(height: 16),
           _buildUpdateIncidentSection(),
@@ -1356,141 +1351,6 @@ class _EvidenceCard extends StatelessWidget {
                   label: const Text('Open File'),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RelatedCasesSection extends StatelessWidget {
-  const _RelatedCasesSection({
-    required this.relatedCases,
-    required this.onCreateCase,
-  });
-
-  final List<Map<String, dynamic>> relatedCases;
-  final VoidCallback? onCreateCase;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DetailSection(
-      title: 'Related Cases',
-      subtitle: 'Barangay case records connected to this incident.',
-      child: relatedCases.isEmpty
-          ? Column(
-              children: <Widget>[
-                const _EmptyPanel(
-                  icon: Icons.folder_open_rounded,
-                  title: 'No related case yet',
-                  message:
-                      'Create a case record if this incident needs '
-                      'formal barangay handling.',
-                ),
-                if (onCreateCase != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: onCreateCase,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Create Case'),
-                    ),
-                  ),
-                ],
-              ],
-            )
-          : Column(
-              children: relatedCases
-                  .map((caseRecord) => _RelatedCaseCard(caseRecord: caseRecord))
-                  .toList(),
-            ),
-    );
-  }
-}
-
-class _RelatedCaseCard extends StatelessWidget {
-  const _RelatedCaseCard({required this.caseRecord});
-
-  final Map<String, dynamic> caseRecord;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: TabangNowTheme.of(context).surfaceMuted,
-        border: Border.all(color: TabangNowTheme.of(context).border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            'Case No. '
-            '${caseRecord['case_number'] ?? caseRecord['id'] ?? '—'}',
-            style: const TextStyle(
-              color: Color(0xFF1D4ED8),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _CompactLine(
-            label: 'Type',
-            value: caseRecord['case_type_label']?.toString() ?? '—',
-          ),
-          _CompactLine(
-            label: 'Status',
-            value: caseRecord['status_label']?.toString() ?? '—',
-          ),
-          _CompactLine(
-            label: 'Hearing Date',
-            value: caseRecord['hearing_date']?.toString() ?? 'No hearing date',
-          ),
-          _CompactLine(
-            label: 'Handled By',
-            value: caseRecord['handled_by']?.toString() ?? 'Not assigned',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactLine extends StatelessWidget {
-  const _CompactLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: TabangNowTheme.of(context).textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: TabangNowTheme.of(context).textSoft,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],

@@ -20,7 +20,6 @@ void main() {
       "title: 'Evidence / Attachments'",
       "title: 'Reporter Information'",
       "title: 'Record Info'",
-      "title: 'Related Cases'",
       "title: 'Update Incident'",
       "labelText: 'Status'",
       "child: const Text('Save Update')",
@@ -78,30 +77,30 @@ void main() {
     expect(source, isNot(contains('remarks:')));
   });
 
-  test('Related Cases stays read-only after Case Management retirement', () {
+  test('retired Case Management UI is absent from incident details', () {
     final detail = File(
       'lib/screens/incident_detail_screen.dart',
     ).readAsStringSync();
 
-    expect(detail, contains("title: 'Related Cases'"));
-    expect(detail, contains('onCreateCase: null'));
+    for (final marker in <String>[
+      "title: 'Related Cases'",
+      '_RelatedCasesSection',
+      '_RelatedCaseCard',
+      'onCreateCase',
+      'CaseManagementService',
+      'CaseFormScreen',
+      '_createRelatedCase',
+    ]) {
+      expect(detail, isNot(contains(marker)), reason: 'Retired UI: $marker');
+    }
 
-    expect(detail, isNot(contains('CaseManagementService')));
-    expect(detail, isNot(contains('CaseFormScreen')));
-    expect(detail, isNot(contains('_createRelatedCase')));
-    expect(detail, isNot(contains('initialIncidentId: widget.incidentId')));
-
-    expect(File('lib/screens/case_form_screen.dart').existsSync(), isFalse);
-
-    expect(
-      File('lib/screens/case_management_screen.dart').existsSync(),
-      isFalse,
-    );
-
-    expect(
-      File('lib/services/case_management_service.dart').existsSync(),
-      isFalse,
-    );
+    for (final path in <String>[
+      'lib/screens/case_form_screen.dart',
+      'lib/screens/case_management_screen.dart',
+      'lib/services/case_management_service.dart',
+    ]) {
+      expect(File(path).existsSync(), isFalse);
+    }
   });
   test('Incident list keeps website controls and numeric ID display', () {
     final source = File('lib/screens/incidents_screen.dart').readAsStringSync();

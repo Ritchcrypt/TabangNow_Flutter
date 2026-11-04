@@ -44,7 +44,9 @@ void main() {
     expect(incidentDetail.contains('CaseManagementService'), isFalse);
     expect(incidentDetail.contains('CaseFormScreen'), isFalse);
     expect(incidentDetail.contains('_createRelatedCase'), isFalse);
-    expect(incidentDetail.contains('onCreateCase: null'), isTrue);
+    expect(incidentDetail.contains('onCreateCase'), isFalse);
+      expect(incidentDetail.contains('_RelatedCasesSection'), isFalse);
+      expect(incidentDetail.contains("title: 'Related Cases'"), isFalse);
 
     for (final path in <String>[
       'lib/screens/case_form_screen.dart',
