@@ -237,7 +237,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     // Match the login page palette and typography while keeping signup light.
     return inherited.copyWith(
-      useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: scheme.copyWith(surface: Colors.white),
       scaffoldBackgroundColor: const Color(0xFFF4F7FB),

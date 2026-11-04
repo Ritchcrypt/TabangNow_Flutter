@@ -94,7 +94,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     final baseTheme = Theme.of(context);
     final theme = baseTheme.copyWith(
-      useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: ColorScheme.fromSeed(
         seedColor: baseTheme.colorScheme.primary,
