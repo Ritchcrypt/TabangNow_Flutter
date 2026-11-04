@@ -6,6 +6,7 @@ import '../core/tabangnow_theme.dart';
 import '../services/activity_log_service.dart';
 import '../services/auth_service.dart';
 import 'activity_log_detail_screen.dart';
+import 'deleted_data_recovery_screen.dart';
 
 class ActivityLogsScreen extends StatefulWidget {
   const ActivityLogsScreen({
@@ -627,6 +628,23 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          if (_role == AppRole.admin) ...<Widget>[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => DeletedDataRecoveryScreen(
+                      authService: widget.authService,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.restore_from_trash_outlined),
+                label: const Text('Deleted Data Recovery'),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           _Surface(
             child: Column(

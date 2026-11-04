@@ -243,9 +243,9 @@ class _ResidentComplaintDetailScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Complaint'),
+        title: const Text('Delete Feedback'),
         content: const Text(
-          'This removes the complaint, resident evidence, staff action proof pictures, and related notifications. This cannot be undone.',
+          'This removes the feedback record, resident evidence, staff action proof pictures, and related notifications. This cannot be undone.',
         ),
         actions: <Widget>[
           TextButton(
@@ -258,7 +258,7 @@ class _ResidentComplaintDetailScreenState
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete Complaint'),
+            child: const Text('Delete Feedback'),
           ),
         ],
       ),
@@ -280,7 +280,7 @@ class _ResidentComplaintDetailScreenState
       }
 
       Navigator.of(context).pop(
-        response['message']?.toString() ?? 'Complaint deleted successfully.',
+        response['message']?.toString() ?? 'Feedback deleted successfully.',
       );
     } catch (exception) {
       if (!mounted) {
@@ -324,7 +324,7 @@ class _ResidentComplaintDetailScreenState
 
     return Scaffold(
       backgroundColor: palette.pageBackground,
-      appBar: AppBar(title: const Text('Complaint Details')),
+      appBar: AppBar(title: const Text('Feedback Details')),
       body: Column(
         children: <Widget>[
           if (_busy) const LinearProgressIndicator(minHeight: 2),
@@ -384,7 +384,7 @@ class _ResidentComplaintDetailScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          'Complaint Details',
+                          'Feedback Details',
                           style: TextStyle(
                             color: palette.textMain,
                             fontSize: 24,
@@ -393,7 +393,7 @@ class _ResidentComplaintDetailScreenState
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          'Resident complaint details, submitted evidence, and action proof.',
+                          'Resident feedback details, submitted supporting picture, and staff action proof.',
                           style: TextStyle(color: palette.textMuted),
                         ),
                       ],
@@ -413,7 +413,7 @@ class _ResidentComplaintDetailScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _SectionTitle(title: 'Complaint Information'),
+              _SectionTitle(title: 'Feedback Information'),
               const SizedBox(height: 16),
               _InfoLine(
                 label: 'Complainant',
@@ -431,14 +431,39 @@ class _ResidentComplaintDetailScreenState
                 label: 'Current Status',
                 value: _text(_complaint['status_label'], 'Submitted'),
               ),
+              _InfoLine(
+                label: 'Category',
+                value: _text(
+                  _complaint['feedback_category_label'],
+                  'Community Concern',
+                ),
+              ),
+              _InfoLine(
+                label: 'Feedback Type',
+                value: _text(
+                  _complaint['feedback_type_label'],
+                  'Concern',
+                ),
+              ),
+              _InfoLine(
+                label: 'Service / Experience Rating',
+                value: _complaint['service_rating'] == null
+                    ? 'Not rated'
+                    : '${_complaint['service_rating']} / 5',
+              ),
               const SizedBox(height: 8),
               _TextBlock(
-                label: 'Address / Location',
+                label: 'Subject',
+                value: _text(_complaint['feedback_subject'], '—'),
+              ),
+              const SizedBox(height: 12),
+              _TextBlock(
+                label: 'Location / Service Area',
                 value: _text(_complaint['complaint_address'], '—'),
               ),
               const SizedBox(height: 12),
               _TextBlock(
-                label: 'Complaint Description',
+                label: 'Feedback Details',
                 value: _text(_complaint['complaint_description'], '—'),
               ),
             ],
@@ -459,7 +484,7 @@ class _ResidentComplaintDetailScreenState
               ),
               const SizedBox(height: 7),
               Text(
-                'Picture uploaded by the resident when the complaint was submitted.',
+                'Supporting picture uploaded by the resident when the feedback was submitted.',
                 style: TextStyle(color: palette.textMuted, fontSize: 12),
               ),
               const SizedBox(height: 14),
@@ -495,7 +520,7 @@ class _ResidentComplaintDetailScreenState
               ),
               const SizedBox(height: 7),
               Text(
-                'Pictures uploaded by admin or official as proof that this complaint is being handled on the ground.',
+                'Pictures uploaded by admin or official as proof that this feedback is being handled on the ground.',
                 style: TextStyle(color: palette.textMuted, fontSize: 12),
               ),
               if (_can('can_update')) ...<Widget>[
@@ -556,7 +581,7 @@ class _ResidentComplaintDetailScreenState
                         decoration: const InputDecoration(
                           labelText: 'Action Note',
                           hintText:
-                              'Example: Barangay official visited the area and checked the complaint.',
+                              'Example: Barangay official reviewed the feedback and documented the action taken.',
                           alignLabelWithHint: true,
                         ),
                       ),
@@ -656,7 +681,7 @@ class _ResidentComplaintDetailScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 const Text(
-                  'Delete Complaint',
+                  'Delete Feedback',
                   style: TextStyle(
                     color: Color(0xFFB91C1C),
                     fontSize: 18,
@@ -665,7 +690,7 @@ class _ResidentComplaintDetailScreenState
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  'This will remove the complaint, evidence picture, action proof pictures, and related notifications.',
+                  'This will remove the feedback record, supporting picture, action proof pictures, and related notifications.',
                   style: TextStyle(
                     color: palette.isDark
                         ? const Color(0xFFFECACA)
@@ -682,7 +707,7 @@ class _ResidentComplaintDetailScreenState
                       foregroundColor: Colors.white,
                     ),
                     onPressed: _busy ? null : _deleteComplaint,
-                    child: const Text('Delete Complaint'),
+                    child: const Text('Delete Feedback'),
                   ),
                 ),
               ],

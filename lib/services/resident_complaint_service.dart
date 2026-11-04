@@ -35,9 +35,13 @@ class ResidentComplaintService {
   }
 
   Future<Map<String, dynamic>> create({
+    required String feedbackCategory,
+    required String feedbackType,
+    required String feedbackSubject,
+    int? serviceRating,
     required String complainantName,
     String? contactNumber,
-    required String complaintAddress,
+    String? complaintAddress,
     required String complaintDescription,
     String? evidencePath,
   }) async {
@@ -54,9 +58,13 @@ class ResidentComplaintService {
     });
 
     request.fields.addAll(<String, String>{
+      'feedback_category': feedbackCategory.trim(),
+      'feedback_type': feedbackType.trim(),
+      'feedback_subject': feedbackSubject.trim(),
+      'service_rating': serviceRating?.toString() ?? '',
       'complainant_name': complainantName.trim(),
       'contact_number': contactNumber?.trim() ?? '',
-      'complaint_address': complaintAddress.trim(),
+      'complaint_address': complaintAddress?.trim() ?? '',
       'complaint_description': complaintDescription.trim(),
     });
 
@@ -242,6 +250,6 @@ class ResidentComplaintService {
 
     return message != null && message.isNotEmpty
         ? message
-        : 'The resident complaint request could not be completed.';
+        : 'The resident feedback request could not be completed.';
   }
 }

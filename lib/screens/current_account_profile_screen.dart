@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/global_image_crop_service.dart';
 import '../services/native_push_service.dart';
 import '../services/profile_service.dart';
+import 'account_mfa_screen.dart';
 
 class CurrentAccountProfileScreen extends StatefulWidget {
   const CurrentAccountProfileScreen({
@@ -61,6 +62,9 @@ class _CurrentAccountProfileScreenState
   Map<String, dynamic> _user = <String, dynamic>{};
   Map<String, dynamic> _permissions = <String, dynamic>{};
   Map<String, dynamic> _passwordPolicy = <String, dynamic>{};
+  List<Map<String, dynamic>> _barangays = <Map<String, dynamic>>[];
+
+  int? _selectedBarangayId;
   Uint8List? _photoBytes;
   PlatformFile? _selectedPhoto;
   Uint8List? _selectedPhotoBytes;
@@ -93,6 +97,7 @@ class _CurrentAccountProfileScreenState
     _emailController.text = _text(user['email'], '');
     _contactController.text = _text(user['contact_number'], '');
     _addressController.text = _text(user['address'], '');
+    _selectedBarangayId = _nullableInt(user['barangay_id']);
   }
 
   Future<void> _load() async {
@@ -111,6 +116,9 @@ class _CurrentAccountProfileScreenState
           : Map<String, dynamic>.from(_user);
       final permissions = _map(response['permissions']);
       final policy = _map(response['password_policy']);
+      final options = _map(response['options']);
+
+      final barangays = _mapList(options['barangays']);
 
       Uint8List? photo;
       if (user['has_profile_photo'] == true) {
@@ -128,6 +136,7 @@ class _CurrentAccountProfileScreenState
         _user = user;
         _permissions = permissions;
         _passwordPolicy = policy;
+        _barangays = barangays;
         _photoBytes = photo;
         _selectedPhoto = null;
         _selectedPhotoBytes = null;
@@ -214,6 +223,7 @@ class _CurrentAccountProfileScreenState
         email: _emailController.text,
         contactNumber: _contactController.text,
         address: _addressController.text,
+        barangayId: _selectedBarangayId,
         profilePhotoPath: _selectedPhoto?.path,
       );
 
@@ -726,6 +736,50 @@ class _CurrentAccountProfileScreenState
                       ? 'Maximum 1000 characters.'
                       : null,
                 ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<int>(
+                  initialValue:
+                      _barangays.any(
+                        (barangay) =>
+                            _nullableInt(barangay['id']) == _selectedBarangayId,
+                      )
+                      ? _selectedBarangayId
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Barangay of Residence',
+                    helperText:
+                        'Used for barangay-targeted announcements and community messages.',
+                    prefixIcon: Icon(Icons.location_city_outlined),
+                  ),
+                  items: _barangays
+                      .map((barangay) {
+                        final id = _nullableInt(barangay['id']);
+
+                        if (id == null) {
+                          return null;
+                        }
+
+                        final name = _text(barangay['name'], 'Barangay #$id');
+
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text(name),
+                        );
+                      })
+                      .whereType<DropdownMenuItem<int>>()
+                      .toList(growable: false),
+                  onChanged: _savingProfile
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _selectedBarangayId = value;
+                          });
+                        },
+                  validator: (value) => value == null
+                      ? 'Select the barangay where you currently live.'
+                      : null,
+                ),
                 const SizedBox(height: 16),
                 _ReadOnlyLine(
                   label: 'Role',
@@ -985,6 +1039,32 @@ class _CurrentAccountProfileScreenState
             ),
           ),
         ],
+        const SizedBox(height: 14),
+        _section(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Two-Factor Authentication (MFA)',
+                style: TextStyle(color: palette.textMain, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text('Account Security: enable or manage an authenticator for safer sign-in.',
+                style: TextStyle(color: palette.textMuted, fontSize: 13)),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AccountMfaScreen(authService: widget.authService),
+                    ),
+                  ),
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Manage Two-Factor Authentication'),
+                ),
+              ),
+            ],
+          ),
+        ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: 12),
           Text(
@@ -1133,6 +1213,25 @@ class _ReadOnlyLine extends StatelessWidget {
 
 Map<String, dynamic> _map(Object? value) {
   return value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+}
+
+List<Map<String, dynamic>> _mapList(Object? value) {
+  if (value is! List) {
+    return <Map<String, dynamic>>[];
+  }
+
+  return value
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList(growable: false);
+}
+
+int? _nullableInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+
+  return int.tryParse(value?.toString() ?? '');
 }
 
 int _int(Object? value, {int fallback = 0}) {

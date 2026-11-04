@@ -10,12 +10,14 @@ class AnnouncementCreateScreen extends StatefulWidget {
     required this.categories,
     required this.priorities,
     required this.audiences,
+    required this.barangays,
   });
 
   final AnnouncementService service;
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> priorities;
   final List<Map<String, dynamic>> audiences;
+  final List<Map<String, dynamic>> barangays;
 
   @override
   State<AnnouncementCreateScreen> createState() =>
@@ -35,6 +37,8 @@ class _AnnouncementCreateScreenState extends State<AnnouncementCreateScreen> {
   bool _calamityMode = false;
   bool _showInWeatherFeed = false;
   bool _saving = false;
+  final Set<int> _selectedBarangayIds = <int>{};
+  String? _barangayError;
 
   @override
   void initState() {
@@ -67,13 +71,52 @@ class _AnnouncementCreateScreenState extends State<AnnouncementCreateScreen> {
     return values.isNotEmpty ? values.first : preferred;
   }
 
+  List<(int, String)> get _barangayChoices {
+    return widget.barangays
+        .map((item) {
+          final id = int.tryParse(item['id']?.toString() ?? '');
+          final name = item['name']?.toString().trim() ?? '';
+
+          if (id == null || id <= 0 || name.isEmpty) {
+            return null;
+          }
+
+          return (id, name);
+        })
+        .whereType<(int, String)>()
+        .toList(growable: false);
+  }
+
+  void _selectAllBarangays() {
+    setState(() {
+      _selectedBarangayIds
+        ..clear()
+        ..addAll(_barangayChoices.map((item) => item.$1));
+      _barangayError = null;
+    });
+  }
+
+  void _clearBarangays() {
+    setState(() {
+      _selectedBarangayIds.clear();
+    });
+  }
+
   Future<void> _save() async {
     if (_saving || !_formKey.currentState!.validate()) {
       return;
     }
 
+    if (_selectedBarangayIds.isEmpty) {
+      setState(() {
+        _barangayError = 'Select at least one target barangay.';
+      });
+      return;
+    }
+
     setState(() {
       _saving = true;
+      _barangayError = null;
     });
 
     try {
@@ -83,6 +126,7 @@ class _AnnouncementCreateScreenState extends State<AnnouncementCreateScreen> {
         category: _category,
         priority: _priority,
         audience: _audience,
+        barangayIds: _selectedBarangayIds.toList()..sort(),
         calamityMode: _calamityMode,
         showInWeatherFeed: _showInWeatherFeed,
       );
@@ -222,11 +266,33 @@ class _AnnouncementCreateScreenState extends State<AnnouncementCreateScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  _TargetBarangaysCard(
+                    barangays: _barangayChoices,
+                    selectedIds: _selectedBarangayIds,
+                    enabled: !_saving,
+                    errorText: _barangayError,
+                    onSelectAll: _selectAllBarangays,
+                    onClear: _clearBarangays,
+                    onChanged: (id, selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedBarangayIds.add(id);
+                        } else {
+                          _selectedBarangayIds.remove(id);
+                        }
+
+                        if (_selectedBarangayIds.isNotEmpty) {
+                          _barangayError = null;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
                   _SettingCard(
                     danger: true,
                     title: '🚨 Activate Calamity Mode',
                     description:
-                        'Triggers system-wide emergency alert and automatically shows this announcement in the Weather & Disaster Feed.',
+                        'Sends an emergency-priority alert only to matching users in the selected barangays and automatically shows this announcement in the Weather & Disaster Feed.',
                     value: _calamityMode,
                     onChanged: _saving
                         ? null
@@ -365,6 +431,138 @@ class _Dropdown extends StatelessWidget {
               }
             }
           : null,
+    );
+  }
+}
+
+class _TargetBarangaysCard extends StatelessWidget {
+  const _TargetBarangaysCard({
+    required this.barangays,
+    required this.selectedIds,
+    required this.enabled,
+    required this.errorText,
+    required this.onSelectAll,
+    required this.onClear,
+    required this.onChanged,
+  });
+
+  final List<(int, String)> barangays;
+  final Set<int> selectedIds;
+  final bool enabled;
+  final String? errorText;
+  final VoidCallback onSelectAll;
+  final VoidCallback onClear;
+  final void Function(int id, bool selected) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TabangNowTheme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.accentSoft.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: errorText == null
+              ? palette.accentText.withValues(alpha: 0.22)
+              : const Color(0xFFDC2626),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Target Barangays *',
+                      style: TextStyle(
+                        color: palette.textMain,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Only users assigned to the selected barangays and matching the chosen audience will receive and see this announcement.',
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              TextButton(
+                onPressed: enabled ? onSelectAll : null,
+                child: const Text('Select All'),
+              ),
+              TextButton(
+                onPressed: enabled && selectedIds.isNotEmpty ? onClear : null,
+                child: const Text('Clear'),
+              ),
+              const Spacer(),
+              Text(
+                '${selectedIds.length}/${barangays.length} selected',
+                style: TextStyle(
+                  color: palette.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 18),
+          if (barangays.isEmpty)
+            Text(
+              'No official Dao barangays are available.',
+              style: TextStyle(
+                color: palette.textMuted,
+                fontSize: 12,
+              ),
+            )
+          else
+            ...barangays.map(
+              (item) => CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(
+                  item.$2,
+                  style: TextStyle(
+                    color: palette.textSoft,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                value: selectedIds.contains(item.$1),
+                onChanged: enabled
+                    ? (value) => onChanged(item.$1, value == true)
+                    : null,
+              ),
+            ),
+          if (errorText != null) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              errorText!,
+              style: const TextStyle(
+                color: Color(0xFFDC2626),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -173,7 +173,7 @@ class _ResidentComplaintsScreenState extends State<ResidentComplaintsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  resident ? 'My Complaints' : 'Resident Complaints',
+                  resident ? 'My Feedback' : 'Resident Feedback',
                   style: TextStyle(
                     color: palette.textMain,
                     fontSize: 26,
@@ -183,8 +183,8 @@ class _ResidentComplaintsScreenState extends State<ResidentComplaintsScreen> {
                 const SizedBox(height: 6),
                 Text(
                   resident
-                      ? 'Submit and track your community complaints.'
-                      : 'Review complaints submitted by residents.',
+                      ? 'Send and track feedback about TabangNow, barangay services, staff response, and community concerns.'
+                      : 'Review feedback submitted by residents.',
                   style: TextStyle(color: palette.textMuted),
                 ),
                 if (_canCreate) ...<Widget>[
@@ -194,7 +194,7 @@ class _ResidentComplaintsScreenState extends State<ResidentComplaintsScreen> {
                     child: FilledButton.icon(
                       onPressed: _create,
                       icon: const Icon(Icons.add_rounded),
-                      label: const Text('Submit Complaint'),
+                      label: const Text('Send Feedback'),
                     ),
                   ),
                 ],
@@ -307,10 +307,41 @@ class _ComplaintCard extends StatelessWidget {
           ),
           const SizedBox(height: 13),
           Text(
-            _text(complaint['complaint_address'], 'No address'),
-            maxLines: 3,
+            _text(
+              complaint['feedback_subject'],
+              _text(complaint['complaint_address'], 'No subject provided'),
+            ),
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: palette.textSoft, height: 1.45),
+            style: TextStyle(
+              color: palette.textMain,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _FeedbackChip(
+                label: _text(
+                  complaint['feedback_category_label'],
+                  'Community Concern',
+                ),
+              ),
+              _FeedbackChip(
+                label: _text(
+                  complaint['feedback_type_label'],
+                  'Concern',
+                ),
+              ),
+              if (complaint['service_rating'] != null)
+                _FeedbackChip(
+                  label: '${complaint['service_rating']} / 5',
+                  icon: Icons.star_rounded,
+                ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -324,11 +355,49 @@ class _ComplaintCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'View complaint',
+                tooltip: 'View feedback',
                 onPressed: onOpen,
                 icon: const Icon(Icons.visibility_outlined),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedbackChip extends StatelessWidget {
+  const _FeedbackChip({required this.label, this.icon});
+
+  final String label;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TabangNowTheme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: palette.surfaceSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (icon != null) ...<Widget>[
+            Icon(icon, size: 13, color: palette.accentText),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: palette.textSoft,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),
@@ -387,7 +456,7 @@ class _EmptyCard extends StatelessWidget {
           const Text('💬', style: TextStyle(fontSize: 34)),
           const SizedBox(height: 12),
           Text(
-            'No complaints found',
+            'No feedback found',
             style: TextStyle(
               color: palette.textMain,
               fontWeight: FontWeight.w900,
@@ -396,8 +465,8 @@ class _EmptyCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             resident
-                ? 'You have not submitted any complaints yet.'
-                : 'No resident complaints have been submitted yet.',
+                ? 'You have not submitted any feedback yet.'
+                : 'No resident feedback has been submitted yet.',
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.textMuted),
           ),

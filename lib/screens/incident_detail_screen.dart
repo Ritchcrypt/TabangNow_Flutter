@@ -10,9 +10,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../services/auth_service.dart';
-import '../services/case_management_service.dart';
 import '../services/incident_service.dart';
-import 'case_form_screen.dart';
 
 class IncidentDetailScreen extends StatefulWidget {
   const IncidentDetailScreen({
@@ -199,86 +197,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     );
   }
 
-  Future<void> _createRelatedCase() async {
-    if (_role != 'admin' || _actionBusy) {
-      return;
-    }
-
-    setState(() {
-      _actionBusy = true;
-    });
-
-    try {
-      final service = CaseManagementService(
-        authService: widget.incidentService.authService,
-      );
-
-      final response = await service.index(page: 1);
-      final options = _map(response['options']);
-      final caseTypes = _mapList(options['case_types']);
-      final caseStatuses = _mapList(options['case_statuses']);
-      final incidents = _mapList(options['incidents']);
-
-      final hasCurrentIncident = incidents.any(
-        (item) => _toInt(item['id']) == widget.incidentId,
-      );
-
-      if (!hasCurrentIncident) {
-        final title =
-            _incident['title']?.toString().trim() ?? 'Untitled Incident';
-
-        incidents.insert(0, <String, dynamic>{
-          'id': widget.incidentId,
-          'title': title,
-          'label': 'Incident #${widget.incidentId} — $title',
-        });
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _actionBusy = false;
-      });
-
-      final message = await Navigator.of(context).push<String>(
-        MaterialPageRoute<String>(
-          builder: (_) => CaseFormScreen(
-            service: service,
-            caseTypes: caseTypes,
-            caseStatuses: caseStatuses,
-            incidents: incidents,
-            initialIncidentId: widget.incidentId,
-          ),
-        ),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (message != null && message.trim().isNotEmpty) {
-        _showMessage(message);
-        await _load();
-      }
-    } on AuthException catch (exception) {
-      if (mounted) {
-        _showMessage(exception.message);
-      }
-    } catch (_) {
-      if (mounted) {
-        _showMessage('Unable to open the Create Case form.');
-      }
-    } finally {
-      if (mounted && _actionBusy) {
-        setState(() {
-          _actionBusy = false;
-        });
-      }
-    }
-  }
-
   Future<void> _runAction({
     required Future<Map<String, dynamic>> Function() action,
     required String successMessage,
@@ -448,7 +366,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     final location = _map(incident['location']);
     final evidence = _mapList(incident['evidence']);
     final histories = _mapList(incident['status_history']);
-    final relatedCases = _mapList(incident['related_cases']);
 
     final latitude = _toDouble(location['latitude']);
     final longitude = _toDouble(location['longitude']);
@@ -664,15 +581,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
             ],
           ),
         ),
-        if (_role == 'admin') ...<Widget>[
-          const SizedBox(height: 16),
-          _RelatedCasesSection(
-            relatedCases: relatedCases,
-            onCreateCase: relatedCases.isEmpty && !_actionBusy
-                ? _createRelatedCase
-                : null,
-          ),
-        ],
         if (_can('can_update')) ...<Widget>[
           const SizedBox(height: 16),
           _buildUpdateIncidentSection(),
@@ -767,29 +675,26 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                   value: -1,
                   child: Text('Unassigned'),
                 ),
-                ...responders
-                    .map((responder) {
-                      final id = _toInt(responder['id']);
+                ...responders.map((responder) {
+                  final id = _toInt(responder['id']);
 
-                      if (id == null) {
-                        return null;
-                      }
+                  if (id == null) {
+                    return null;
+                  }
 
-                      return DropdownMenuItem<int>(
-                        value: id,
-                        child: Text(
-                          responder['name']?.toString() ?? 'Tanod #$id',
-                        ),
-                      );
-                    })
-                    .whereType<DropdownMenuItem<int>>(),
+                  return DropdownMenuItem<int>(
+                    value: id,
+                    child: Text(responder['name']?.toString() ?? 'Tanod #$id'),
+                  );
+                }).whereType<DropdownMenuItem<int>>(),
               ],
               onChanged: _actionBusy
                   ? null
                   : (value) {
                       setState(() {
-                        _selectedResponderId =
-                            value == null || value < 1 ? null : value;
+                        _selectedResponderId = value == null || value < 1
+                            ? null
+                            : value;
                         _assignmentChanged = true;
                       });
                     },
@@ -1446,141 +1351,6 @@ class _EvidenceCard extends StatelessWidget {
                   label: const Text('Open File'),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RelatedCasesSection extends StatelessWidget {
-  const _RelatedCasesSection({
-    required this.relatedCases,
-    required this.onCreateCase,
-  });
-
-  final List<Map<String, dynamic>> relatedCases;
-  final VoidCallback? onCreateCase;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DetailSection(
-      title: 'Related Cases',
-      subtitle: 'Barangay case records connected to this incident.',
-      child: relatedCases.isEmpty
-          ? Column(
-              children: <Widget>[
-                const _EmptyPanel(
-                  icon: Icons.folder_open_rounded,
-                  title: 'No related case yet',
-                  message:
-                      'Create a case record if this incident needs '
-                      'formal barangay handling.',
-                ),
-                if (onCreateCase != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: onCreateCase,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Create Case'),
-                    ),
-                  ),
-                ],
-              ],
-            )
-          : Column(
-              children: relatedCases
-                  .map((caseRecord) => _RelatedCaseCard(caseRecord: caseRecord))
-                  .toList(),
-            ),
-    );
-  }
-}
-
-class _RelatedCaseCard extends StatelessWidget {
-  const _RelatedCaseCard({required this.caseRecord});
-
-  final Map<String, dynamic> caseRecord;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: TabangNowTheme.of(context).surfaceMuted,
-        border: Border.all(color: TabangNowTheme.of(context).border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            'Case No. '
-            '${caseRecord['case_number'] ?? caseRecord['id'] ?? '—'}',
-            style: const TextStyle(
-              color: Color(0xFF1D4ED8),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _CompactLine(
-            label: 'Type',
-            value: caseRecord['case_type_label']?.toString() ?? '—',
-          ),
-          _CompactLine(
-            label: 'Status',
-            value: caseRecord['status_label']?.toString() ?? '—',
-          ),
-          _CompactLine(
-            label: 'Hearing Date',
-            value: caseRecord['hearing_date']?.toString() ?? 'No hearing date',
-          ),
-          _CompactLine(
-            label: 'Handled By',
-            value: caseRecord['handled_by']?.toString() ?? 'Not assigned',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactLine extends StatelessWidget {
-  const _CompactLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: TabangNowTheme.of(context).textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: TabangNowTheme.of(context).textSoft,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],

@@ -55,11 +55,61 @@ class RegistrationService {
 
   final http.Client _client;
 
+  Future<List<Map<String, dynamic>>> fetchBarangays() async {
+    late final http.Response response;
+
+    final endpoint = Uri.parse('$_baseUrl/api/v1/auth/barangays');
+
+    try {
+      response = await _client
+          .get(
+            endpoint,
+            headers: const <String, String>{'Accept': 'application/json'},
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const RegistrationException(
+        'Unable to load barangays right now. Please retry.',
+      );
+    } on SocketException {
+      throw const RegistrationException(
+        'Unable to connect to TabangNow right now. Please try again.',
+      );
+    } on http.ClientException {
+      throw const RegistrationException(
+        'Unable to connect to TabangNow right now. Please try again.',
+      );
+    }
+
+    final data = _decode(response);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw RegistrationException(
+        _errorMessage(data),
+        statusCode: response.statusCode,
+      );
+    }
+
+    final raw = data['data'];
+
+    if (raw is! List) {
+      return <Map<String, dynamic>>[];
+    }
+
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> registerResident({
     required String name,
     required String email,
     required String contactNumber,
     required String address,
+    required String dateOfBirth,
+    required bool ageConfirmation,
+    int? barangayId,
     required String password,
     required String passwordConfirmation,
   }) async {
@@ -80,6 +130,9 @@ class RegistrationService {
               'email': email.trim(),
               'contact_number': contactNumber.trim(),
               'address': address.trim(),
+              'barangay_id': ?barangayId,
+              'date_of_birth': dateOfBirth.trim(),
+              'age_confirmation': ageConfirmation,
               'password': password,
               'password_confirmation': passwordConfirmation,
             }),

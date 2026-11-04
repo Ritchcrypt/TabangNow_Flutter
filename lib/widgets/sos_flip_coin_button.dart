@@ -141,6 +141,20 @@ class _LogoFace extends StatelessWidget {
   }
 
   Widget _bundledLogo() {
+    // This offline fallback is the official Dao seal supplied by the project.
+    // A valid administrator-uploaded system logo still takes precedence.
+    return Image.asset(
+      'assets/branding/dao_official_seal.jpg',
+      width: size,
+      height: size,
+      fit: logoFit,
+      alignment: Alignment.center,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (context, error, stackTrace) => _fallbackMonogram(),
+    );
+  }
+
+  Widget _fallbackMonogram() {
     return DecoratedBox(
       decoration: const BoxDecoration(
         shape: BoxShape.circle,

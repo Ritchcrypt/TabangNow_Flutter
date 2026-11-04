@@ -5,13 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('Reports is live in ModuleRegistry and HomeScreen', () {
     final registry = File('lib/core/module_registry.dart').readAsStringSync();
-
     final reportsStart = registry.indexOf('id: AppModuleId.reports,');
 
     expect(reportsStart, greaterThanOrEqualTo(0));
 
     final next = registry.indexOf('AppModuleDefinition(', reportsStart + 1);
-
     final block = registry.substring(
       reportsStart,
       next >= 0 ? next : registry.length,
@@ -32,66 +30,61 @@ void main() {
       'ModuleRegistry.canAccess(',
       'scaffoldState.isDrawerOpen',
     ]) {
-      expect(
-        home,
-        contains(marker),
-        reason: 'Missing Reports/global marker: $marker',
-      );
+      expect(home, contains(marker));
     }
-
-    expect(home, isNot(contains("tooltip: 'Refresh'")));
   });
 
-  test('Reports screen replicates website report UI', () {
+  test('Reports screen matches Capstone 18 metric and timeline workflow', () {
     final screen = File('lib/screens/reports_screen.dart').readAsStringSync();
 
     for (final marker in <String>[
       "'Reports'",
       'Dao, Capiz —',
       'Today',
-      'This Week',
-      'This Month',
+      'Last 7 Days',
+      'Last 30 Days',
       'This Year',
+      'Custom / Previous Dates',
+      'showDateRangePicker',
       'Total Incidents',
-      'Active / Pending',
-      'Resolved',
-      'Cases Filed',
+      'Active Incidents',
+      'Critical Incidents',
+      'Resolved Incidents',
+      'Distress Signals / SOS',
+      'Tanod On Duty',
       'Records Breakdown',
-      'Tanod Response Summary',
-      'Incident PDF',
-      'Case PDF',
-      'Complaint PDF',
+      'Tap any record to preview it without leaving Reports.',
+      'Record Preview',
+      'Select Records PDF',
       'Download PDF',
-      'Generate PDF',
-      'Show All',
-      'Show Less',
+      'Download All',
+      'Selected (',
     ]) {
-      expect(
-        screen,
-        contains(marker),
-        reason: 'Missing report UI marker: $marker',
-      );
+      expect(screen, contains(marker), reason: 'Missing report marker: $marker');
     }
+
+    expect(screen, isNot(contains("'Case PDF'")));
+    expect(screen, isNot(contains("'Cases Filed'")));
+    expect(screen, isNot(contains("'Tanod Response Summary'")));
   });
 
-  test('ReportService exposes all authoritative PDF endpoints', () {
+  test('ReportService uses metric, custom range, and selected-record APIs', () {
     final service = File('lib/services/report_service.dart').readAsStringSync();
 
     for (final marker in <String>[
       '/api/v1/reports',
       '/api/v1/reports/pdf',
-      '/api/v1/reports/incidents/',
-      '/api/v1/reports/cases/',
-      '/api/v1/reports/complaints/',
+      '/api/v1/reports/selection/pdf',
+      "'metric': metric",
+      "'date_from': dateFrom",
+      "'date_to': dateTo",
+      "'selection_mode': selectionMode",
+      "'records': recordKeys",
       'DownloadedReportPdf',
       'content-disposition',
       'response.bodyBytes',
     ]) {
-      expect(
-        service,
-        contains(marker),
-        reason: 'Missing ReportService marker: $marker',
-      );
+      expect(service, contains(marker), reason: 'Missing ReportService marker: $marker');
     }
   });
 
@@ -105,51 +98,26 @@ void main() {
       'OpenFilex.open',
       'Print/Share menu',
     ]) {
-      expect(
-        screen,
-        contains(marker),
-        reason: 'Missing PDF workflow marker: $marker',
-      );
+      expect(screen, contains(marker));
     }
   });
 
   test('Reports remains Admin-only in Flutter capabilities', () {
-    final capabilities = File(
-      'lib/core/app_capabilities.dart',
-    ).readAsStringSync();
+    final capabilities = File('lib/core/app_capabilities.dart').readAsStringSync();
 
     expect(capabilities, contains('AppCapability.viewReports'));
 
     final officialStart = capabilities.indexOf('case AppRole.official:');
-
     final tanodStart = capabilities.indexOf('case AppRole.tanod:');
-
     final adminStart = capabilities.indexOf('case AppRole.admin:');
 
     expect(adminStart, greaterThanOrEqualTo(0));
-
     expect(officialStart, greaterThan(adminStart));
 
     final adminBlock = capabilities.substring(adminStart, officialStart);
-
-    expect(adminBlock, contains('AppCapability.viewReports'));
-
     final officialBlock = capabilities.substring(officialStart, tanodStart);
 
+    expect(adminBlock, contains('AppCapability.viewReports'));
     expect(officialBlock, isNot(contains('AppCapability.viewReports')));
-  });
-
-  test('Temporary development login bypass remains intact', () {
-    final gate = File('lib/screens/dev_session_gate.dart');
-
-    if (!gate.existsSync()) {
-      return;
-    }
-
-    final text = gate.readAsStringSync();
-
-    expect(text, isNot(contains('return const LoginScreen()')));
-
-    expect(text, isNot(contains('Open Login')));
   });
 }

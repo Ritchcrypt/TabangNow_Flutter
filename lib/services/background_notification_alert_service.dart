@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vibration/vibration.dart';
 
@@ -33,15 +34,15 @@ class TabangNowNotificationAlert {
   static const String channelDescription =
       'TabangNow notifications with enhanced sound and vibration';
 
-  static const String moderateChannelId = 'tabangnow_moderate_v1';
+  static const String moderateChannelId = 'tabangnow_moderate_v2';
   static const String moderateChannelName = 'Moderate Alerts';
   static const String moderateChannelDescription =
-      'Important TabangNow alerts requiring attention';
+      'Important TabangNow alerts: sound without vibration';
 
-  static const String lowChannelId = 'tabangnow_low_v1';
+  static const String lowChannelId = 'tabangnow_low_v2';
   static const String lowChannelName = 'Low Priority Updates';
   static const String lowChannelDescription =
-      'Routine TabangNow status and informational updates';
+      'Routine TabangNow updates: sound without vibration';
 
   static const String silentChannelId = 'tabangnow_silent_v1';
   static const String silentChannelName = 'Silent Updates';
@@ -71,18 +72,6 @@ class TabangNowNotificationAlert {
     850,
     250,
     1200,
-  ]);
-
-  static final Int64List _moderateVibrationPattern = Int64List.fromList(<int>[
-    0,
-    250,
-    120,
-    350,
-  ]);
-
-  static final Int64List _lowVibrationPattern = Int64List.fromList(<int>[
-    0,
-    120,
   ]);
 
   static final FlutterLocalNotificationsPlugin _plugin =
@@ -183,8 +172,7 @@ class TabangNowNotificationAlert {
         sound: const RawResourceAndroidNotificationSound(
           'tabangnow_moderate_v1',
         ),
-        enableVibration: true,
-        vibrationPattern: _moderateVibrationPattern,
+        enableVibration: false,
         showBadge: true,
       ),
     );
@@ -196,11 +184,8 @@ class TabangNowNotificationAlert {
         description: lowChannelDescription,
         importance: Importance.defaultImportance,
         playSound: true,
-        sound: const RawResourceAndroidNotificationSound(
-          'tabangnow_low_v1',
-        ),
-        enableVibration: true,
-        vibrationPattern: _lowVibrationPattern,
+        sound: const RawResourceAndroidNotificationSound('tabangnow_low_v1'),
+        enableVibration: false,
         showBadge: true,
       ),
     );
@@ -343,8 +328,7 @@ class TabangNowNotificationAlert {
           sound: const RawResourceAndroidNotificationSound(
             'tabangnow_moderate_v1',
           ),
-          enableVibration: true,
-          vibrationPattern: _moderateVibrationPattern,
+          enableVibration: false,
           autoCancel: true,
           ongoing: false,
           onlyAlertOnce: false,
@@ -372,11 +356,8 @@ class TabangNowNotificationAlert {
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
           playSound: true,
-          sound: const RawResourceAndroidNotificationSound(
-            'tabangnow_low_v1',
-          ),
-          enableVibration: true,
-          vibrationPattern: _lowVibrationPattern,
+          sound: const RawResourceAndroidNotificationSound('tabangnow_low_v1'),
+          enableVibration: false,
           autoCancel: true,
           ongoing: false,
           onlyAlertOnce: false,
@@ -445,9 +426,7 @@ class TabangNowNotificationAlert {
     );
   }
 
-  static Future<_AlertDecision> _safeArbitrate(
-    TabangNowAlertTier tier,
-  ) async {
+  static Future<_AlertDecision> _safeArbitrate(TabangNowAlertTier tier) async {
     try {
       return await _arbitrate(tier);
     } catch (_) {
@@ -656,10 +635,7 @@ class TabangNowNotificationAlert {
       final state = await _readArbiterState(stateFile);
       final result = action(state);
 
-      await stateFile.writeAsString(
-        jsonEncode(state.toJson()),
-        flush: true,
-      );
+      await stateFile.writeAsString(jsonEncode(state.toJson()), flush: true);
 
       return result;
     } finally {
@@ -688,9 +664,7 @@ class TabangNowNotificationAlert {
         return _AlertArbiterState();
       }
 
-      return _AlertArbiterState.fromJson(
-        Map<String, dynamic>.from(decoded),
-      );
+      return _AlertArbiterState.fromJson(Map<String, dynamic>.from(decoded));
     } catch (_) {
       return _AlertArbiterState();
     }
@@ -823,13 +797,57 @@ class TabangNowNotificationAlert {
     }
   }
 
-  static TabangNowAlertTier _tierFromData(Map<String, dynamic> data) {
-    final explicitTier =
-        (data['alert_tier']?.toString() ?? '').trim().toLowerCase();
+  // Pure tier resolver exposed for deterministic tests; no Firebase or Android
+  // plugin initialization is needed to verify notification severity routing.
+  @visibleForTesting
+  static TabangNowAlertTier tierFromDataForTest(Map<String, dynamic> data) {
+    return _tierFromData(data);
+  }
 
+  static TabangNowAlertTier _tierFromData(Map<String, dynamic> data) {
+    final type = (data['type']?.toString() ?? '').trim().toLowerCase();
+
+    // Authoritative shared list with Laravel's FirebasePushService.
+    // App-side override protects against older deployed servers that still
+    // send Moderate/Low for these user-approved Code Red event categories.
+    const codeRedTypes = <String>{
+      'announcement',
+      'calamity',
+      'mobile_emergency',
+      'emergency',
+      'incident',
+      'incident_reported',
+      'incident_message',
+      'incident_update',
+      'incident_updated',
+      'incident_status_update',
+      'assigned_incident',
+      'incident_assigned',
+      'new_assigned_incident',
+      'dispatch',
+      'escalation',
+      'tanod_alert',
+      'tanod_task',
+      'tanod_task_assigned',
+      'task_assigned',
+      'tanod_task_update',
+      'tanod_task_response',
+      'task_update',
+    };
+
+    if (codeRedTypes.contains(type)) {
+      return TabangNowAlertTier.critical;
+    }
+
+    final explicitTier = (data['alert_tier']?.toString() ?? '')
+        .trim()
+        .toLowerCase();
+
+    // A new or unknown category cannot impersonate a Code Red event even if
+    // an outdated server sends the critical field. Keep non-red tiers audible.
     switch (explicitTier) {
       case 'critical':
-        return TabangNowAlertTier.critical;
+        return TabangNowAlertTier.moderate;
       case 'moderate':
         return TabangNowAlertTier.moderate;
       case 'low':
@@ -838,15 +856,7 @@ class TabangNowNotificationAlert {
         return TabangNowAlertTier.silent;
     }
 
-    // Backward-compatible safety fallback for an older server payload. Only
-    // explicit emergency types may become Code Red. Everything unknown is LOW.
-    final type = (data['type']?.toString() ?? '').trim().toLowerCase();
-    if (type == 'mobile_emergency' ||
-        type == 'emergency' ||
-        type == 'calamity') {
-      return TabangNowAlertTier.critical;
-    }
-
+    // Missing server severity is routine/Low, not a surprise Code Red.
     return TabangNowAlertTier.low;
   }
 

@@ -27,6 +27,7 @@ class AuthService {
     required String password,
     required String deviceName,
     bool remember = false,
+    String? mfaCode,
   }) async {
     late final http.Response response;
 
@@ -42,6 +43,7 @@ class AuthService {
               'email': email.trim(),
               'password': password,
               'device_name': deviceName.trim(),
+              if (mfaCode != null) 'mfa_code': mfaCode.trim(),
             }),
           )
           .timeout(_requestTimeout);
@@ -60,6 +62,11 @@ class AuthService {
     }
 
     final data = _decodeResponse(response);
+
+    // A successful password step is not yet an authenticated session.
+    if (response.statusCode == 202 && data['mfa_required'] == true) {
+      return data;
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final token = data['access_token'];
@@ -129,6 +136,49 @@ class AuthService {
     );
   }
 
+  /// Complete an emailed password reset inside the Flutter application.
+  /// Uses the same reset token broker as the Laravel website.
+  Future<String> completePasswordReset({
+    required String token,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    late final http.Response response;
+
+    try {
+      response = await _client
+          .post(
+            Uri.parse('$_baseUrl/api/v1/auth/reset-password'),
+            headers: const <String, String>{
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(<String, String>{
+              'token': token,
+              'email': email.trim().toLowerCase(),
+              'password': password,
+              'password_confirmation': passwordConfirmation,
+            }),
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const AuthException('Unable to connect to TabangNow right now. Please try again.');
+    } on SocketException {
+      throw const AuthException('Unable to connect to TabangNow right now. Please try again.');
+    } on http.ClientException {
+      throw const AuthException('Unable to connect to TabangNow right now. Please try again.');
+    }
+
+    final data = _decodeResponse(response);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data['message']?.toString() ?? 'Password reset successfully.';
+    }
+    throw AuthException(
+      _extractErrorMessage(data),
+      statusCode: response.statusCode,
+    );
+  }
   Future<Map<String, dynamic>> devSession() async {
     final response = await _client.post(
       Uri.parse('$_baseUrl/api/v1/auth/dev-session'),
@@ -190,7 +240,6 @@ class AuthService {
     );
   }
 
-
   Future<void> presenceHeartbeat() async {
     final token = await getToken();
 
@@ -209,10 +258,14 @@ class AuthService {
           )
           .timeout(_requestTimeout);
     } on TimeoutException {
+      // Presence heartbeat is best-effort; ignore transient timeouts.
     } on SocketException {
+      // Presence heartbeat is best-effort; ignore temporary network loss.
     } on http.ClientException {
+      // Presence heartbeat is best-effort; ignore transient client failures.
     }
   }
+
   Future<Map<String, dynamic>> dashboard() {
     return _authorizedGet('/api/v1/dashboard');
   }
@@ -319,6 +372,18 @@ class AuthService {
 
     if (statusCode == 401 || inactiveAccount) {
       await clearToken();
+    }
+  }
+
+  /// Replace a revoked MFA-pre-enrollment token without changing Remember Me.
+  Future<void> replaceAccessToken(String token) async {
+    if (token.trim().isEmpty) {
+      throw const AuthException('The new session token is missing.');
+    }
+    final remembered = await _storage.read(key: _tokenKey);
+    _sessionToken = token;
+    if (remembered != null && remembered.isNotEmpty) {
+      await _storage.write(key: _tokenKey, value: token);
     }
   }
 

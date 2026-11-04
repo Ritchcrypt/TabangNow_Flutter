@@ -29,10 +29,6 @@ void main() {
         '📋',
       );
       expect(
-        moduleFor(AppRole.admin, AppModuleId.caseManagement).websiteGlyph,
-        '📘',
-      );
-      expect(
         moduleFor(AppRole.admin, AppModuleId.announcements).websiteGlyph,
         '📢',
       );
@@ -51,13 +47,13 @@ void main() {
       );
     });
 
-    test('resident complaint entry uses website form glyph', () {
+    test('resident feedback entry uses website form glyph', () {
       final complaint = moduleFor(
         AppRole.resident,
         AppModuleId.residentComplaints,
       );
 
-      expect(complaint.labelFor(AppRole.resident), 'Complaints Form');
+      expect(complaint.labelFor(AppRole.resident), 'Resident Feedback');
       expect(complaint.websiteGlyphFor(AppRole.resident), '📝');
     });
   });

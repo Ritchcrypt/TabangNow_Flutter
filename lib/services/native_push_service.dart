@@ -129,7 +129,6 @@ class NativePushService with WidgetsBindingObserver {
   final http.Client _client = http.Client();
 
   AuthService? _authenticatedAuthService;
-  bool _initialized = false;
   bool _ready = false;
   bool _observerAttached = false;
   bool _listenersAttached = false;
@@ -141,7 +140,6 @@ class NativePushService with WidgetsBindingObserver {
     }
 
     if (!Platform.isAndroid) {
-      _initialized = true;
       return;
     }
 
@@ -149,8 +147,6 @@ class NativePushService with WidgetsBindingObserver {
       WidgetsBinding.instance.addObserver(this);
       _observerAttached = true;
     }
-
-    _initialized = true;
 
     try {
       final launchData = await TabangNowNotificationAlert.initializeMain(
@@ -193,8 +189,23 @@ class NativePushService with WidgetsBindingObserver {
       } catch (_) {}
 
       if (!_listenersAttached) {
-        FirebaseMessaging.onMessage.listen((message) {
+        FirebaseMessaging.onMessage.listen((message) async {
           NativePushBridge.received(message);
+
+          try {
+            await TabangNowNotificationAlert.showFromData(message.data);
+
+            debugPrint(
+              '[TabangNow Push] Foreground notification alert rendered.',
+            );
+          } catch (exception, stackTrace) {
+            debugPrint(
+              '[TabangNow Push] Foreground notification alert FAILED: '
+              '$exception',
+            );
+
+            debugPrintStack(stackTrace: stackTrace);
+          }
         });
 
         FirebaseMessaging.onMessageOpenedApp.listen(NativePushBridge.opened);
@@ -221,7 +232,6 @@ class NativePushService with WidgetsBindingObserver {
     } catch (exception, stackTrace) {
       _messaging = null;
       _ready = false;
-      _initialized = false;
 
       debugPrint('[TabangNow Push] Firebase initialization FAILED: $exception');
       debugPrintStack(stackTrace: stackTrace);

@@ -524,7 +524,7 @@ class _UserManagementDetailScreenState
               const SizedBox(height: 6),
               Text(
                 _permissions['is_self'] == true
-                    ? 'This is your current administrator account. Self-deactivation, self-demotion, and self-deletion remain blocked. The final active administrator cannot be demoted, deactivated, or deleted.'
+                    ? 'This is your signed-in administrator account. User Management cannot delete or deactivate this account. To manage your own credentials or account security, open My Profile. The final active administrator remains protected.'
                     : 'Security-sensitive changes are confirmed and rechecked by Laravel policies and transaction locks. The final active administrator cannot be demoted, deactivated, or deleted.',
                 style: TextStyle(
                   color: palette.textMuted,

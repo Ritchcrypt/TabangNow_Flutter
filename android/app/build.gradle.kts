@@ -58,6 +58,10 @@ android {
         multiDexEnabled = true
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Set -PTABANGNOW_RESET_HOST=your.real.https.domain when building
+        // the release APK. Unconfigured builds cannot claim another host.
+        manifestPlaceholders["tabangnowResetHost"] =
+            providers.gradleProperty("TABANGNOW_RESET_HOST").orNull ?: "example.invalid"
     }
 
     signingConfigs {

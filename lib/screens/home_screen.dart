@@ -18,6 +18,7 @@ import '../core/app_role.dart';
 import '../core/module_registry.dart';
 
 import '../services/auth_service.dart';
+import '../widgets/shared_dashboard_welcome_banner.dart';
 import '../services/branding_service.dart';
 import '../services/incident_service.dart';
 import '../services/resident_complaint_service.dart';
@@ -39,7 +40,6 @@ import 'resident_complaint_detail_screen.dart';
 import 'resident_complaints_screen.dart';
 import 'tanod_roster_screen.dart';
 import 'tanod_tasks_screen.dart';
-import 'case_management_screen.dart';
 import 'system_branding_screen.dart';
 
 const String _tabangNowWebsiteLogoBase64 =
@@ -54,7 +54,6 @@ enum _HomeModule {
   tanodAlerts,
   tanodRoster,
   tanodTasks,
-  caseManagement,
   announcements,
   hotlines,
   residentComplaints,
@@ -502,11 +501,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         break;
 
       case 'caseManagement':
-        if (ModuleRegistry.canAccess(_appRole, AppModuleId.caseManagement)) {
-          _selectModule(_HomeModule.caseManagement);
-          return;
-        }
-
+        // Case Management is retired from the mobile shell.
+        // Preserve old notification compatibility by returning
+        // users safely to Dashboard.
         _selectModule(_HomeModule.dashboard);
         return;
 
@@ -673,11 +670,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return TanodRosterScreen(authService: _authService, user: widget.user);
       case _HomeModule.tanodTasks:
         return TanodTasksScreen(authService: _authService, user: widget.user);
-      case _HomeModule.caseManagement:
-        return CaseManagementScreen(
-          authService: _authService,
-          user: widget.user,
-        );
       case _HomeModule.residentComplaints:
         return ResidentComplaintsScreen(
           authService: _authService,
@@ -894,7 +886,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     AppModuleId.tanodAlerts => _HomeModule.tanodAlerts,
     AppModuleId.tanodRoster => _HomeModule.tanodRoster,
     AppModuleId.tanodTasks => _HomeModule.tanodTasks,
-    AppModuleId.caseManagement => _HomeModule.caseManagement,
     AppModuleId.announcements => _HomeModule.announcements,
     AppModuleId.emergencyHotlines => _HomeModule.hotlines,
     AppModuleId.residentComplaints => _HomeModule.residentComplaints,
@@ -912,7 +903,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _HomeModule.tanodAlerts => AppModuleId.tanodAlerts,
     _HomeModule.tanodRoster => AppModuleId.tanodRoster,
     _HomeModule.tanodTasks => AppModuleId.tanodTasks,
-    _HomeModule.caseManagement => AppModuleId.caseManagement,
     _HomeModule.announcements => AppModuleId.announcements,
     _HomeModule.hotlines => AppModuleId.emergencyHotlines,
     _HomeModule.residentComplaints => AppModuleId.residentComplaints,
@@ -967,6 +957,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: <Widget>[
+          SharedDashboardWelcomeBanner(
+            authService: _authService,
+            userName: _userName,
+            isAdmin: _role == 'admin',
+          ),
+          const SizedBox(height: 20),
           if (isAdminOrOfficial)
             _DashboardTitleBlock(
               title: _role == 'admin'
@@ -1036,12 +1032,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           return;
         }
 
-        if (metric.label == 'Active Cases' &&
-            ModuleRegistry.canAccess(_appRole, AppModuleId.caseManagement)) {
-          _selectModule(_HomeModule.caseManagement);
-          return;
-        }
-
         _selectModule(_HomeModule.incidents);
         return;
 
@@ -1086,8 +1076,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
-            label: 'Active Cases',
-            value: value('active_cases'),
+            label: 'Active Incidents',
+            value: value('active_incidents'),
             icon: Icons.schedule_rounded,
             accent: const Color(0xFFD97706),
             background: TabangNowTheme.of(context).surface,
@@ -1103,7 +1093,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           _DashboardMetric(
             label: 'Resolved',
-            value: value('resolved_cases'),
+            value: value('resolved_incidents'),
             icon: Icons.check_circle_rounded,
             accent: const Color(0xFF059669),
             background: TabangNowTheme.of(context).surface,
@@ -1121,12 +1111,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       case 'official':
       case 'dao':
-        final activeCases =
-            summary['active_cases'] ??
-            (_asInt(summary['pending_incidents']) +
-                _asInt(summary['active_incidents']));
-        final resolvedCases =
-            summary['resolved_cases'] ?? summary['resolved_incidents'] ?? 0;
+        final activeIncidents = summary['active_incidents'] ?? 0;
+        final resolvedIncidents = summary['resolved_incidents'] ?? 0;
 
         return <_DashboardMetric>[
           _DashboardMetric(
@@ -1138,8 +1124,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             border: TabangNowTheme.of(context).ring,
           ),
           _DashboardMetric(
-            label: 'Active Cases',
-            value: activeCases.toString(),
+            label: 'Active Incidents',
+            value: activeIncidents.toString(),
             icon: Icons.schedule_rounded,
             accent: const Color(0xFFD97706),
             background: TabangNowTheme.of(context).surface,
@@ -1155,7 +1141,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           _DashboardMetric(
             label: 'Resolved',
-            value: resolvedCases.toString(),
+            value: resolvedIncidents.toString(),
             icon: Icons.check_circle_rounded,
             accent: const Color(0xFF059669),
             background: TabangNowTheme.of(context).surface,
@@ -1319,14 +1305,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     return <String, dynamic>{};
-  }
-
-  static int _asInt(dynamic value) {
-    if (value is int) {
-      return value;
-    }
-
-    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   static List<Map<String, dynamic>> _mapList(dynamic raw) {
@@ -1563,11 +1541,6 @@ class _SummaryCard extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 17,
-                      color: metric.accent,
                     ),
                   ],
                 ),

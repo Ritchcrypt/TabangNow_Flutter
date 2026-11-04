@@ -32,7 +32,7 @@ void main() {
     expect(incident, contains('Take Evidence Photo'));
     expect(incident, contains('Choose Existing Evidence'));
 
-    expect(complaintCreate, contains('Take Evidence Photo'));
+    expect(complaintCreate, contains('Take Supporting Feedback Photo'));
     expect(complaintCreate, contains('Choose Existing Picture'));
 
     expect(complaintDetail, contains('Take Action Proof Photo'));

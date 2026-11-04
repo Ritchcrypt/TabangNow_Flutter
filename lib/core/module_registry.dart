@@ -51,13 +51,6 @@ class ModuleRegistry {
       mobileImplemented: true,
     ),
     AppModuleDefinition(
-      id: AppModuleId.caseManagement,
-      defaultLabel: 'Case Management',
-      icon: Icons.folder_open_rounded,
-      websiteGlyph: '📘',
-      mobileImplemented: true,
-    ),
-    AppModuleDefinition(
       id: AppModuleId.announcements,
       defaultLabel: 'Announcements',
       icon: Icons.campaign_rounded,
@@ -73,7 +66,7 @@ class ModuleRegistry {
     ),
     AppModuleDefinition(
       id: AppModuleId.residentComplaints,
-      defaultLabel: 'Resident Complaints',
+      defaultLabel: 'Resident Feedback',
       icon: Icons.chat_bubble_outline_rounded,
       websiteGlyph: '💬',
       mobileImplemented: true,
@@ -120,7 +113,10 @@ class ModuleRegistry {
     return _modules
         .where(
           (definition) =>
-              definition.showInNavigation && canAccess(role, definition.id),
+              definition.showInNavigation &&
+              canAccess(role, definition.id) &&
+              !(role == AppRole.tanod &&
+                  definition.id == AppModuleId.distressSignal),
         )
         .toList(growable: false);
   }
@@ -149,9 +145,6 @@ class ModuleRegistry {
           AppCapability.manageTanodTasks,
           AppCapability.respondToTanodTasks,
         });
-
-      case AppModuleId.caseManagement:
-        return capabilities.allows(AppCapability.viewCaseManagement);
 
       case AppModuleId.announcements:
         return capabilities.allows(AppCapability.viewAnnouncements);

@@ -80,10 +80,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final baseTheme = Theme.of(context);
+    final theme = baseTheme.copyWith(
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: baseTheme.colorScheme.primary,
+        brightness: Brightness.light,
+      ).copyWith(surface: Colors.white),
+      scaffoldBackgroundColor: Colors.white,
+    );
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+    return Theme(
+      data: theme,
+      child: Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
         surfaceTintColor: theme.colorScheme.surface,
@@ -95,13 +105,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(22, 24, 22, 32),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: const BoxConstraints(maxWidth: 440),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(26, 30, 26, 28),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: theme.dividerColor),
                 ),
                 child: Form(
@@ -109,7 +119,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      const PublicAuthBrandingHeader(logoSize: 72),
+                      const PublicAuthBrandingHeader(logoSize: 104),
                       const SizedBox(height: 24),
                       Text(
                         'Reset your password',
@@ -238,6 +248,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

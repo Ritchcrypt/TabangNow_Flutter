@@ -544,7 +544,7 @@ class _DistressSignalCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'View →',
+                    'View',
                     style: TextStyle(
                       color: theme.colorScheme.primary,
                       fontSize: 12,

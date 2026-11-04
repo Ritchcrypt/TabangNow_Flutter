@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -58,12 +59,69 @@ class MobileUpdatePolicy {
   }
 }
 
+/// Validates remote version metadata without allowing non-HTTPS download links.
+/// The production APK must explicitly supply API_BASE_URL at build time.
+class MobileUpdateTransportPolicy {
+  const MobileUpdateTransportPolicy._();
+
+  static bool isAllowedApiRoot(
+    String value, {
+    required bool allowLoopbackHttp,
+  }) {
+    final uri = _parse(value);
+    if (uri == null || (uri.path.isNotEmpty && uri.path != '/') ||
+        uri.hasQuery || uri.hasFragment) {
+      return false;
+    }
+    if (uri.scheme == 'https') {
+      return _isPublicHost(uri.host) && (!uri.hasPort || uri.port == 443);
+    }
+    return allowLoopbackHttp && uri.scheme == 'http' &&
+        _isLoopbackHost(uri.host) && (!uri.hasPort || uri.port == 8000);
+  }
+
+  static bool isAllowedDownload(String value) {
+    final uri = _parse(value);
+    return uri != null && uri.scheme == 'https' &&
+        _isPublicHost(uri.host) && (!uri.hasPort || uri.port == 443);
+  }
+
+  static Uri? _parse(String value) {
+    if (value.isEmpty || value != value.trim() ||
+        value.contains('\\') || RegExp(r'[\x00-\x20\x7f]').hasMatch(value)) {
+      return null;
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null || !uri.hasAuthority || uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty) {
+      return null;
+    }
+    return uri;
+  }
+
+  static bool _isLoopbackHost(String host) {
+    return host == '127.0.0.1' || host == 'localhost' || host == '::1';
+  }
+
+  static bool _isPublicHost(String host) {
+    final lower = host.toLowerCase();
+    if (_isLoopbackHost(lower) || lower.endsWith('.local') ||
+        lower.startsWith('10.') || lower.startsWith('192.168.') ||
+        lower.startsWith('127.') || lower.startsWith('169.254.') ||
+        RegExp(r'^172\.(1[6-9]|2[0-9]|3[0-1])\.').hasMatch(lower)) {
+      return false;
+    }
+    // No raw IP-address destinations or single-label names for public links.
+    return lower.contains('.') && RegExp(r'^[a-z0-9][a-z0-9.-]*[a-z0-9]$').hasMatch(lower);
+  }
+}
+
 class MobileUpdateService {
   const MobileUpdateService();
 
   static const String _apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://scsis-production-ac26.up.railway.app',
+    defaultValue: '',
   );
 
   Future<MobileUpdateCheck> check() async {
@@ -78,6 +136,15 @@ class MobileUpdateService {
       final baseUrl = _apiBaseUrl.endsWith('/')
           ? _apiBaseUrl.substring(0, _apiBaseUrl.length - 1)
           : _apiBaseUrl;
+
+      // Local USB development may use loopback HTTP. Release builds fail
+      // closed unless a public HTTPS API_BASE_URL was supplied explicitly.
+      if (!MobileUpdateTransportPolicy.isAllowedApiRoot(
+        baseUrl,
+        allowLoopbackHttp: !kReleaseMode,
+      )) {
+        return const MobileUpdateCheck.unavailable();
+      }
 
       final response = await http
           .get(
@@ -111,7 +178,7 @@ class MobileUpdateService {
       if (latestBuildNumber == null ||
           minimumSupportedBuildNumber == null ||
           latestVersion.isEmpty ||
-          downloadUrl.isEmpty) {
+          !MobileUpdateTransportPolicy.isAllowedDownload(downloadUrl)) {
         return const MobileUpdateCheck.unavailable();
       }
 
