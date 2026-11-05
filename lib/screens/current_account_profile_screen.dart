@@ -468,6 +468,7 @@ class _CurrentAccountProfileScreenState
 
   Future<void> _openNotificationSettings() async {
     final settings = await NativePushService.instance.notificationSettings();
+    final registrationStatus = NativePushService.instance.registrationStatus;
     if (!mounted) return;
 
     final notificationsLabel = settings.notificationsEnabled
@@ -491,6 +492,8 @@ class _CurrentAccountProfileScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text('Notifications: $notificationsLabel'),
+            const SizedBox(height: 8),
+            Text('Device push: $registrationStatus'),
             const SizedBox(height: 8),
             Text('Sound: $soundLabel'),
             const SizedBox(height: 8),
@@ -517,6 +520,16 @@ class _CurrentAccountProfileScreenState
               },
               child: const Text('Request Permission'),
             ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await NativePushService.instance.retryForAuthenticatedUser(
+                widget.authService,
+              );
+              _showMessage(NativePushService.instance.registrationStatus);
+            },
+            child: const Text('Retry Device Registration'),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.of(dialogContext).pop();
