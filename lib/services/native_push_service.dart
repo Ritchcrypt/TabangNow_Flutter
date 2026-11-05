@@ -144,6 +144,12 @@ class NativePushService with WidgetsBindingObserver {
   bool _observerAttached = false;
   bool _listenersAttached = false;
   bool _backgroundHandlerRegistered = false;
+  // Fresh-install token provisioning can be temporarily unavailable.
+  // Never create overlapping registrations or retry after sign-out.
+  Timer? _registrationRetryTimer;
+  int _registrationRetryAttempts = 0;
+  bool _registrationInProgress = false;
+  String _registrationStatus = 'Device registration not started.';
 
   Future<void> initialize() async {
     if (_ready && _messaging != null) {
@@ -227,7 +233,7 @@ class NativePushService with WidgetsBindingObserver {
           if (authService != null && token.trim().isNotEmpty) {
             debugPrint('[TabangNow Push] FCM token refreshed.');
 
-            unawaited(_registerToken(token.trim(), authService));
+            unawaited(syncForAuthenticatedUser(authService));
           }
         });
 
@@ -249,70 +255,139 @@ class NativePushService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> syncForAuthenticatedUser(AuthService authService) async {
-    _authenticatedAuthService = authService;
+  /// The last local registration state. It never contains a raw push token.
+  String get registrationStatus => _registrationStatus;
 
-    /*
-     * The application may have experienced a temporary Firebase startup
-     * failure before authentication completed. Retry here instead of leaving
-     * the device permanently unregistered.
-     */
-    if (!_ready || _messaging == null) {
-      debugPrint(
-        '[TabangNow Push] Firebase not ready; retrying initialization.',
-      );
-
-      await initialize();
+  /// A fresh Android installation may need time for Play services to issue
+  /// its first FCM token. Try again on a bounded schedule and on app resume.
+  static Duration? registrationRetryDelay(int failedAttempts) {
+    switch (failedAttempts) {
+      case 0:
+        return const Duration(seconds: 5);
+      case 1:
+        return const Duration(seconds: 20);
+      case 2:
+        return const Duration(minutes: 1);
+      case 3:
+        return const Duration(minutes: 3);
+      default:
+        return null;
     }
+  }
 
-    final messaging = _messaging;
-
-    if (!_ready || messaging == null) {
-      debugPrint(
-        '[TabangNow Push] Registration aborted: Firebase unavailable.',
-      );
+  void _scheduleRegistrationRetry(AuthService authService) {
+    if (!identical(_authenticatedAuthService, authService)) {
       return;
     }
 
+    final delay = registrationRetryDelay(_registrationRetryAttempts);
+    if (delay == null) {
+      _registrationStatus =
+          'Device not registered. Open Notification Settings and tap Retry.';
+      return;
+    }
+
+    _registrationRetryAttempts++;
+    _registrationStatus =
+        '$_registrationStatus Retry in ${delay.inSeconds} seconds.';
+    _registrationRetryTimer?.cancel();
+    _registrationRetryTimer = Timer(delay, () {
+      if (identical(_authenticatedAuthService, authService)) {
+        unawaited(syncForAuthenticatedUser(authService));
+      }
+    });
+  }
+
+  /// User-triggered retry, independent of any prior automatic retry limit.
+  Future<void> retryForAuthenticatedUser(AuthService authService) async {
+    _registrationRetryAttempts = 0;
+    await syncForAuthenticatedUser(authService);
+  }
+
+  Future<void> syncForAuthenticatedUser(AuthService authService) async {
+    if (!identical(_authenticatedAuthService, authService)) {
+      _registrationRetryAttempts = 0;
+    }
+    _authenticatedAuthService = authService;
+
+    // Foreground app resume and FCM's token refresh may happen at once.
+    if (_registrationInProgress) {
+      return;
+    }
+    _registrationInProgress = true;
+    _registrationRetryTimer?.cancel();
+    _registrationRetryTimer = null;
+    _registrationStatus = 'Connecting device notifications...';
+
     try {
-      final settings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      if (!_ready || _messaging == null) {
+        await initialize();
+      }
 
-      debugPrint(
-        '[TabangNow Push] Permission: '
-        '${settings.authorizationStatus}',
-      );
+      final messaging = _messaging;
+      if (!_ready || messaging == null) {
+        throw StateError('Firebase initialization unavailable.');
+      }
 
-      if (settings.authorizationStatus == AuthorizationStatus.denied) {
-        debugPrint('[TabangNow Push] Notification permission denied.');
+      NotificationSettings? settings;
+      try {
+        settings = await messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      } catch (exception) {
+        // Permission UI can fail while a fresh Activity is initializing.
+        // Token registration must still be attempted on Android.
+        debugPrint('[TabangNow Push] Permission request failed: $exception');
+      }
+
+      final permissionBlocked =
+          settings?.authorizationStatus == AuthorizationStatus.denied;
+      if (permissionBlocked) {
+        debugPrint(
+          '[TabangNow Push] Android notifications blocked; '
+          'continuing server token registration.',
+        );
+      }
+
+      final rawToken = await messaging.getToken().timeout(
+        const Duration(seconds: 25),
+      );
+      final token = rawToken?.trim() ?? '';
+      if (token.isEmpty) {
+        throw StateError('Firebase returned an empty device token.');
+      }
+
+      if (!identical(_authenticatedAuthService, authService)) {
+        return;
+      }
+      await _registerToken(token, authService);
+      if (!identical(_authenticatedAuthService, authService)) {
         return;
       }
 
-      final token = (await messaging.getToken())?.trim() ?? '';
-
-      if (token.isEmpty) {
-        throw StateError('Firebase returned an empty FCM token.');
-      }
-
-      debugPrint(
-        '[TabangNow Push] FCM token acquired '
-        '(length=${token.length}).',
-      );
-
-      await _registerToken(token, authService);
-
+      _registrationRetryAttempts = 0;
+      _registrationStatus = permissionBlocked
+          ? 'Device registered. Enable notifications in Android settings.'
+          : 'Device registered with TabangNow.';
       debugPrint('[TabangNow Push] DEVICE REGISTRATION SUCCESS.');
     } catch (exception, stackTrace) {
+      // Do not show FCM tokens, server responses or credentials in the UI.
       debugPrint('[TabangNow Push] DEVICE REGISTRATION FAILED: $exception');
-
       debugPrintStack(stackTrace: stackTrace);
+      _registrationStatus = 'Registration failed (${exception.runtimeType}).';
+      _scheduleRegistrationRetry(authService);
+    } finally {
+      _registrationInProgress = false;
     }
   }
 
   Future<void> unregisterForAuthenticatedUser(AuthService authService) async {
+    _registrationRetryTimer?.cancel();
+    _registrationRetryTimer = null;
+    _registrationRetryAttempts = 0;
+    _registrationStatus = 'Not signed in.';
     await TabangNowNotificationAlert.stopPersistentAlert();
 
     final messaging = _messaging;
@@ -372,7 +447,7 @@ class NativePushService with WidgetsBindingObserver {
     final authToken = (await authService.getToken())?.trim() ?? '';
 
     if (authToken.isEmpty) {
-      return;
+      throw StateError('No authenticated session for push registration.');
     }
 
     final installationId = await _installationId();
